@@ -1790,6 +1790,13 @@ public:
    static uint32_t _cpuUsageCircularBufferUpdateFrequencySec;
    static uint32_t _cpuUsageCircularBufferSize;
 
+   // For collectBackTrace control
+   // 0: no collection, 1: collect back trace with no insertion, 2: collect and insert
+   static uint32_t _collectBackTrace;
+   // Control if backtrace to be printed
+   // 0: print 1: silent
+   static uint32_t _noPrintBackTrace;
+
    // Debug counter insertion options
    static TR::SimpleRegex *_debugCounterInsertByteCode;
    static TR::SimpleRegex *_debugCounterInsertJittedBody;

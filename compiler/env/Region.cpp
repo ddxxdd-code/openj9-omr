@@ -22,10 +22,24 @@
 #include "env/MemorySegment.hpp"
 #include "env/SegmentProvider.hpp"
 #include "env/Region.hpp"
+#include "infra/CriticalSection.hpp"
 #include "infra/ReferenceWrapper.hpp"
 #include "env/TRMemory.hpp"
+#include "infra/Monitor.hpp"
+#include "control/OMROptions.hpp"
+#include <unordered_map>
+#include <libunwind.h>
+#include <execinfo.h>
 
 namespace TR {
+
+// static PersistentUnorderedMap<size_t, void *> *heapAllocMapList = NULL;
+static PersistentUnorderedMap<size_t, PersistentUnorderedMap<allocEntry, size_t> *> *heapAllocMapList = NULL;
+static Monitor *heapAllocMapListMonitor;
+static PersistentAllocator *_persistentAllocator = NULL;
+static PersistentUnorderedMap<size_t, PersistentUnorderedMap<allocEntry, size_t> *> *stackAllocMapList = NULL;
+static Monitor *stackAllocMapListMonitor;
+size_t total_method_compiled = 0;
 
 Region::Region(TR::SegmentProvider &segmentProvider, TR::RawAllocator rawAllocator) :
    _bytesAllocated(0),
@@ -35,6 +49,22 @@ Region::Region(TR::SegmentProvider &segmentProvider, TR::RawAllocator rawAllocat
    _currentSegment(TR::ref(_initialSegment)),
    _lastDestructable(NULL)
    {
+      if (OMR::Options::_collectBackTrace > 1)
+      {
+         if (is_heap)
+         {
+         // OMR::CriticalSection mapAllocCS(heapAllocMapListMonitor);
+         heapAllocMap = new (PERSISTENT_NEW) PersistentUnorderedMap<allocEntry, size_t>(PersistentUnorderedMap<allocEntry, size_t>::allocator_type(*_persistentAllocator));
+         // heapAllocMapMonitor = Monitor::create("JITCompilerHeapAllocMapMonitor");
+         }
+      }
+      if (OMR::Options::_collectBackTrace == 1)
+      {
+         if (!is_heap)
+         {
+         stackAllocMap = new (PERSISTENT_NEW) PersistentUnorderedMap<allocEntry, size_t>(PersistentUnorderedMap<allocEntry, size_t>::allocator_type(*_persistentAllocator));
+         }
+      }
    }
 
 Region::Region(const Region &prototype) :
@@ -45,10 +75,61 @@ Region::Region(const Region &prototype) :
    _currentSegment(TR::ref(_initialSegment)),
    _lastDestructable(NULL)
    {
+      if (OMR::Options::_collectBackTrace > 1)
+      {
+         if (is_heap)
+         {
+         // OMR::CriticalSection mapAllocCS(heapAllocMapListMonitor);
+         heapAllocMap = new (PERSISTENT_NEW) PersistentUnorderedMap<allocEntry, size_t>(PersistentUnorderedMap<allocEntry, size_t>::allocator_type(*_persistentAllocator));
+         // heapAllocMapMonitor = Monitor::create("JITCompilerHeapAllocMapMonitor");
+         }
+      }
+      if (OMR::Options::_collectBackTrace == 1)
+      {
+         if (!is_heap)
+         {
+         stackAllocMap = new (PERSISTENT_NEW) PersistentUnorderedMap<allocEntry, size_t>(PersistentUnorderedMap<allocEntry, size_t>::allocator_type(*_persistentAllocator));
+         }
+      }
    }
 
 Region::~Region() throw()
    {
+      if (OMR::Options::_collectBackTrace == 2)
+      {
+      if (is_heap)
+         {
+         // add heapAllocMap to heapAllocMapList
+         if (heapAllocMapList && heapAllocMapListMonitor)
+            {
+            OMR::CriticalSection listInsertCS(heapAllocMapListMonitor);
+            heapAllocMapList->insert({total_method_compiled, heapAllocMap});
+            }
+         else
+            {
+            printf("heapAllocMapList unintialized\n");
+            }      
+         }
+      total_method_compiled += 1;
+      heapAllocMap = NULL;
+      }
+   if (OMR::Options::_collectBackTrace == 1)
+      {
+      if (!is_heap)
+         {
+         if (stackAllocMapList && stackAllocMapListMonitor)
+            {
+            OMR::CriticalSection listInsertCS(stackAllocMapListMonitor);
+            stackAllocMapList->insert({total_method_compiled, stackAllocMap});
+            }
+         else
+            {
+            printf("stackAllocMapList unintialized\n");
+            }      
+         }
+      total_method_compiled += 1;
+      stackAllocMap = NULL;
+      }
    /*
     * Destroy all object instances that depend on the region
     * to manage their lifetimes.
@@ -76,6 +157,64 @@ Region::~Region() throw()
 void *
 Region::allocate(size_t const size, void *hint)
    {
+      if (OMR::Options::_collectBackTrace > 1)
+      {
+      if (is_heap) 
+         {
+         // Backtrace heap allocation
+         // printf("Heap allocate [%u] bytes\n", size);
+         // fflush(stdout);
+         // struct allocEntry *entry = new(PERSISTENT_NEW) allocEntry;
+         struct allocEntry entry;
+         entry.traceSize = unw_backtrace(entry.trace, MAX_BACKTRACE_SIZE);
+         // entry->traceSize = backtrace(entry->trace, MAX_BACKTRACE_SIZE);
+         // OMR::CriticalSection cs(heapAllocMapMonitor);
+         if (heapAllocMap)
+            {
+            auto match = heapAllocMap->find(entry);
+            if (match != heapAllocMap->end())
+               {
+               match->second += size;
+               }
+            else
+               {
+               heapAllocMap->insert({entry, size});
+               }
+            }
+         else
+            {
+            printf("heapAllocMap is not built\n");
+            }
+         // backtrace_symbols_fd(entry->trace, entry->traceSize, fileno(stdout));
+         // printf("=== end ===\n");
+         // fflush(stdout);
+         }
+      }
+   if (OMR::Options::_collectBackTrace == 1)
+      {
+      if (!is_heap) 
+         {
+         // Backtrace stack allocation
+         struct allocEntry entry;
+         entry.traceSize = unw_backtrace(entry.trace, MAX_BACKTRACE_SIZE);
+         if (stackAllocMap)
+            {
+            auto match = stackAllocMap->find(entry);
+            if (match != stackAllocMap->end())
+               {
+               match->second += size;
+               }
+            else
+               {
+               stackAllocMap->insert({entry, size});
+               }
+            }
+         else
+            {
+            printf("stackAllocMap is not built\n");
+            }
+         }
+      }
    size_t const roundedSize = round(size);
    if (_currentSegment.get().remaining() >= roundedSize)
       {
@@ -99,5 +238,73 @@ size_t
 Region::round(size_t bytes)
    {
    return (bytes+15) & (~15);
+   }
+
+void
+Region::init_alloc_map_list(TR::PersistentAllocator *allocator)
+   {
+      if (OMR::Options::_collectBackTrace > 1)
+      {
+      _persistentAllocator = allocator;
+      heapAllocMapList = new (PERSISTENT_NEW) PersistentUnorderedMap<size_t, PersistentUnorderedMap<allocEntry, size_t> *>(PersistentUnorderedMap<size_t, PersistentUnorderedMap<allocEntry, size_t> *>::allocator_type(*allocator));
+      // heapAllocMapList = new (PERSISTENT_NEW) PersistentUnorderedMap<size_t, void *>(PersistentUnorderedMap<size_t, void *>::allocator_type(*allocator));
+      heapAllocMapListMonitor = Monitor::create("JITCompilerHeapAllocMapListMonitor");
+      }
+      if (OMR::Options::_collectBackTrace == 1)
+      {
+      _persistentAllocator = allocator;
+      stackAllocMapList = new (PERSISTENT_NEW) PersistentUnorderedMap<size_t, PersistentUnorderedMap<allocEntry, size_t> *>(PersistentUnorderedMap<size_t, PersistentUnorderedMap<allocEntry, size_t> *>::allocator_type(*allocator));
+      // heapAllocMapList = new (PERSISTENT_NEW) PersistentUnorderedMap<size_t, void *>(PersistentUnorderedMap<size_t, void *>::allocator_type(*allocator));
+      stackAllocMapListMonitor = Monitor::create("JITCompilerStackAllocMapListMonitor");
+      }
+   }
+
+void
+Region::print_alloc_entry() 
+   {
+   if (OMR::Options::_collectBackTrace == 2 && OMR::Options::_noPrintBackTrace == 0)
+      {
+      if (!heapAllocMapList) {
+         printf("no map to print\n");
+         return;
+      }
+      for (auto &pair : *heapAllocMapList) 
+         {
+         // fflush(stdout);
+         printf("Method [%lu]\n", pair.first);
+         // fflush(stdout);
+         for (auto &heapAllocPair : *(pair.second))
+            {
+            printf("Heap Allocated [%lu] bytes\n", heapAllocPair.second);
+            fflush(stdout);
+            backtrace_symbols_fd((void **)heapAllocPair.first.trace, heapAllocPair.first.traceSize, fileno(stdout));
+            fflush(stdout);
+            }
+         printf("=== End ===\n");
+         fflush(stdout);
+         }
+      }
+   if (OMR::Options::_collectBackTrace == 1 && OMR::Options::_noPrintBackTrace == 0)
+      {
+      if (!stackAllocMapList) {
+         printf("no map to print\n");
+         return;
+      }
+      for (auto &pair : *stackAllocMapList) 
+         {
+         // fflush(stdout);
+         printf("Method [%lu]\n", pair.first);
+         // fflush(stdout);
+         for (auto &stackAllocPair : *(pair.second))
+            {
+            printf("Heap Allocated [%lu] bytes\n", stackAllocPair.second);
+            // fflush(stdout);
+            backtrace_symbols_fd((void **)stackAllocPair.first.trace, stackAllocPair.first.traceSize, fileno(stdout));
+            // fflush(stdout);
+            }
+         printf("=== End ===\n");
+         fflush(stdout);
+         }
+      }
    }
 }

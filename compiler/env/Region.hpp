@@ -31,6 +31,30 @@
 #include "env/TypedAllocator.hpp"
 #include "env/MemorySegment.hpp"
 #include "env/RawAllocator.hpp"
+#include "env/PersistentAllocator.hpp"
+#include <unordered_map>
+
+#define MAX_BACKTRACE_SIZE 10
+
+template<typename K, typename V>
+using PersistentUnorderedMapAllocator = TR::typed_allocator<std::pair<const K, V>, TR::PersistentAllocator &>;
+template<typename K, typename V, typename H = std::hash<K>, typename E = std::equal_to<K>>
+using PersistentUnorderedMap = std::unordered_map<K, V, H, E, PersistentUnorderedMapAllocator<K, V>>;
+
+struct allocEntry
+   {
+   int traceSize;
+   void *trace[MAX_BACKTRACE_SIZE];
+
+   bool operator==(const allocEntry &other) const 
+      {
+         if(traceSize != other.traceSize)
+            {
+            return false;
+            }
+         return memcmp(trace, other.trace, sizeof(void *)*traceSize) == 0;
+      }
+   };
 
 namespace TR {
 
@@ -89,6 +113,16 @@ public:
    Region(const Region &prototype);
    virtual ~Region() throw();
    void * allocate(const size_t bytes, void * hint = 0);
+
+   static void init_alloc_map_list(TR::PersistentAllocator *allocator);
+   // static void init_heap_alloc_map();
+   static void print_alloc_entry();
+
+   // Signifier for the type of memory
+   bool is_heap = true;
+   // UnorderedMap to collect allocation heaps in this region
+   PersistentUnorderedMap<allocEntry, size_t> *heapAllocMap;
+   PersistentUnorderedMap<allocEntry, size_t> *stackAllocMap;
 
    /**
     * @brief A function template to create a Region-managed object instance.
@@ -174,5 +208,21 @@ TR::Region::create(const T &value)
    _lastDestructable = static_cast<Destructable *>(instance);
    return instance->value();
    }
-
+   
+namespace std {
+  template <>
+  struct hash<allocEntry>
+   {
+   std::size_t operator()(const allocEntry& k) const
+      {
+      using std::hash;
+      size_t result = hash<int>()(k.traceSize);
+      for (int i = 0; i < k.traceSize; i++) 
+         {
+         result ^= hash<void *>()(k.trace[i]);
+         }
+      return result;
+      }
+   };
+}
 #endif // OMR_REGION_HPP
