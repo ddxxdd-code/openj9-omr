@@ -298,3 +298,4 @@ Region::print_alloc_entry()
          }
       }
    }
+}
