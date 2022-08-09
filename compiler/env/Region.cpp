@@ -199,7 +199,7 @@ Region::init_alloc_map_list(TR::PersistentAllocator *allocator)
 void
 Region::print_alloc_entry() 
    {
-   if (OMR::Options::_collectBackTrace == 2)
+   if (OMR::Options::_noPrintBackTrace > 0)
       {
       if (!heapAllocMapList) {
          printf("no map to print\n");
@@ -207,7 +207,7 @@ Region::print_alloc_entry()
       }
       for (auto &pair : *heapAllocMapList) 
          {
-         if (OMR::Options::_noPrintBackTrace == 0)
+         if (OMR::Options::_noPrintBackTrace == 2)
             {
             // fflush(stdout);
             printf("Method [%lu]\n", pair.first);
