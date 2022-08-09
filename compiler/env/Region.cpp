@@ -262,7 +262,7 @@ Region::init_alloc_map_list(TR::PersistentAllocator *allocator)
 void
 Region::print_alloc_entry() 
    {
-   if (OMR::Options::_collectBackTrace == 2 && OMR::Options::_noPrintBackTrace == 0)
+   if (OMR::Options::_collectBackTrace == 2)
       {
       if (!heapAllocMapList) {
          printf("no map to print\n");
@@ -270,41 +270,31 @@ Region::print_alloc_entry()
       }
       for (auto &pair : *heapAllocMapList) 
          {
-         // fflush(stdout);
-         printf("Method [%lu]\n", pair.first);
-         // fflush(stdout);
-         for (auto &heapAllocPair : *(pair.second))
-            {
-            printf("Heap Allocated [%lu] bytes\n", heapAllocPair.second);
-            fflush(stdout);
-            backtrace_symbols_fd((void **)heapAllocPair.first.trace, heapAllocPair.first.traceSize, fileno(stdout));
-            fflush(stdout);
-            }
-         printf("=== End ===\n");
-         fflush(stdout);
-         }
-      }
-   if (OMR::Options::_collectBackTrace == 1 && OMR::Options::_noPrintBackTrace == 0)
-      {
-      if (!stackAllocMapList) {
-         printf("no map to print\n");
-         return;
-      }
-      for (auto &pair : *stackAllocMapList) 
-         {
-         // fflush(stdout);
-         printf("Method [%lu]\n", pair.first);
-         // fflush(stdout);
-         for (auto &stackAllocPair : *(pair.second))
-            {
-            printf("Heap Allocated [%lu] bytes\n", stackAllocPair.second);
-            // fflush(stdout);
-            backtrace_symbols_fd((void **)stackAllocPair.first.trace, stackAllocPair.first.traceSize, fileno(stdout));
-            // fflush(stdout);
-            }
-         printf("=== End ===\n");
-         fflush(stdout);
+            if (OMR::Options::_noPrintBackTrace == 0)
+               {
+               // fflush(stdout);
+               printf("Method [%lu]\n", pair.first);
+               // fflush(stdout);
+               for (auto &heapAllocPair : *(pair.second))
+                  {
+                  printf("Heap Allocated [%lu] bytes\n", heapAllocPair.second);
+                  // fflush(stdout);
+                  backtrace_symbols_fd((void **)heapAllocPair.first.trace, heapAllocPair.first.traceSize, fileno(stdout));
+                  // fflush(stdout);
+                  }
+               printf("=== End ===\n");
+               fflush(stdout);
+               }
+            else
+               {
+                  for (auto &heapAllocPair : *(pair.second))
+                  {
+                  // printf("Heap Allocated [%lu] bytes\n", heapAllocPair.second);
+                  // fflush(stdout);
+                  char **temp = backtrace_symbols((void **)heapAllocPair.first.trace, heapAllocPair.first.traceSize);
+                  // fflush(stdout);
+                  }
+               }
          }
       }
    }
-}
