@@ -73,19 +73,23 @@ namespace std {
    };
 }
 
-struct regionLog
+class regionLog
    {
-   int regionTraceSize;
-   void *regionTrace[64];
-   char *compInfo;
+   public:
+      bool is_heap;
+      int regionTraceSize;
+      void *regionTrace[MAX_BACKTRACE_SIZE];
+      char *compInfo;
 
-   PersistentUnorderedMap<allocEntry, size_t> allocMap;
-   // PersistentUnorderedMap<allocEntry, size_t>(PersistentUnorderedMap<allocEntry, size_t>::allocator_type(*_persistentAllocator)) allocMap;
-   bool operator==(const regionLog &other) const 
-      {
-         return allocMap == other.allocMap;
-      }
-   };
+      PersistentUnorderedMap<allocEntry, size_t> *allocMap;
+      // PersistentUnorderedMap<allocEntry, size_t>(PersistentUnorderedMap<allocEntry, size_t>::allocator_type(*_persistentAllocator)) allocMap;
+      regionLog(TR::PersistentAllocator *allocator);
+      bool operator==(const regionLog &other) const 
+         {
+            return allocMap == other.allocMap;
+         }
+      };
+
 namespace std {
    template<>
    struct hash<regionLog>
@@ -161,7 +165,7 @@ public:
    static void print_alloc_entry();
 
    // Signifier for the type of memory
-   bool is_heap = true;
+   // bool is_heap = true;
    // UnorderedMap to collect allocation heaps in this region
    struct regionLog *heapAllocMap;
    // PersistentUnorderedMap<allocEntry, size_t> *heapAllocMap;
