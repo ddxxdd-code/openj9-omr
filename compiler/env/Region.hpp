@@ -73,17 +73,14 @@ namespace std {
    };
 }
 
-class regionLog
+struct regionLog
    {
-   public:
-      PersistentUnorderedMap<allocEntry, size_t> allocMap;
-   
-      regionLog();
+   PersistentUnorderedMap<allocEntry, size_t> allocMap;
    // PersistentUnorderedMap<allocEntry, size_t>(PersistentUnorderedMap<allocEntry, size_t>::allocator_type(*_persistentAllocator)) allocMap;
-   // bool operator==(const regionLog &other) const 
-   //    {
-   //       return false;
-   //    }
+   bool operator==(const regionLog &other) const 
+      {
+         return allocMap == other.allocMap;
+      }
    };
 namespace std {
    template<>
@@ -162,7 +159,8 @@ public:
    // Signifier for the type of memory
    bool is_heap = true;
    // UnorderedMap to collect allocation heaps in this region
-   regionLog *heapAllocMap;
+   struct regionLog *heapAllocMap;
+   // PersistentUnorderedMap<allocEntry, size_t> *heapAllocMap;
    // PersistentUnorderedMap<allocEntry, size_t> *heapAllocMap;
 
    /**

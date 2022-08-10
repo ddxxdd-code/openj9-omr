@@ -31,10 +31,10 @@
 #include <libunwind.h>
 #include <execinfo.h>
 
-regionLog::regionLog()
-   {
-   allocMap = new (PERSISTENT_NEW) PersistentUnorderedMap<allocEntry, size_t>();
-   }
+// regionLog::regionLog()
+//    {
+//    allocMap = new (PERSISTENT_NEW) PersistentUnorderedMap<allocEntry, size_t>(PersistentUnorderedMap<allocEntry, size_t>::allocator_type(*_persistentAllocator));
+//    }
 
 namespace TR {
 
@@ -57,7 +57,7 @@ Region::Region(TR::SegmentProvider &segmentProvider, TR::RawAllocator rawAllocat
          if (is_heap)
          {
          // OMR::CriticalSection mapAllocCS(heapAllocMapListMonitor);
-         heapAllocMap = new (PERSISTENT_NEW) regionLog;
+         heapAllocMap = new (PERSISTENT_NEW) struct regionLog;
          // heapAllocMapMonitor = Monitor::create("JITCompilerHeapAllocMapMonitor");
          }
       }
@@ -75,7 +75,8 @@ Region::Region(const Region &prototype) :
       {
          if (is_heap)
          {
-         heapAllocMap = new (PERSISTENT_NEW) regionLog;
+            heapAllocMap = new (PERSISTENT_NEW) struct regionLog;
+         // heapAllocMap = new (PERSISTENT_NEW) PersistentUnorderedMap<regionLog, size_t>(PersistentUnorderedMap<regionLog, size_t>::allocator_type(*_persistentAllocator));
          // OMR::CriticalSection mapAllocCS(heapAllocMapListMonitor);
          // heapAllocMap = new (PERSISTENT_NEW) PersistentUnorderedMap<allocEntry, size_t>(PersistentUnorderedMap<allocEntry, size_t>::allocator_type(*_persistentAllocator));
          // heapAllocMapMonitor = Monitor::create("JITCompilerHeapAllocMapMonitor");
@@ -144,8 +145,8 @@ Region::allocate(size_t const size, void *hint)
          // OMR::CriticalSection cs(heapAllocMapMonitor);
          if (heapAllocMap)
             {
-            auto match = heapAllocMap->allocMap->find(entry);
-            if (match != heapAllocMap->allocMap->end())
+            auto match = heapAllocMap->allocMap.find(entry);
+            if (match != heapAllocMap->allocMap.end())
                {
                match->second += size;
                }
