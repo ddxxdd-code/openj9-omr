@@ -75,6 +75,10 @@ namespace std {
 
 struct regionLog
    {
+   int regionTraceSize;
+   void *regionTrace[64];
+   char *compInfo;
+
    PersistentUnorderedMap<allocEntry, size_t> allocMap;
    // PersistentUnorderedMap<allocEntry, size_t>(PersistentUnorderedMap<allocEntry, size_t>::allocator_type(*_persistentAllocator)) allocMap;
    bool operator==(const regionLog &other) const 
