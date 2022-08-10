@@ -34,11 +34,9 @@
 namespace TR {
 
 // static PersistentUnorderedMap<size_t, void *> *heapAllocMapList = NULL;
-static PersistentUnorderedMap<size_t, PersistentUnorderedMap<allocEntry, size_t> *> *heapAllocMapList = NULL;
+static PersistentUnorderedMap<size_t, regionLog *> *heapAllocMapList = NULL;
 static Monitor *heapAllocMapListMonitor;
 static PersistentAllocator *_persistentAllocator = NULL;
-static PersistentUnorderedMap<size_t, PersistentUnorderedMap<allocEntry, size_t> *> *stackAllocMapList = NULL;
-static Monitor *stackAllocMapListMonitor;
 size_t total_method_compiled = 0;
 
 Region::Region(TR::SegmentProvider &segmentProvider, TR::RawAllocator rawAllocator) :
@@ -54,7 +52,7 @@ Region::Region(TR::SegmentProvider &segmentProvider, TR::RawAllocator rawAllocat
          if (is_heap)
          {
          // OMR::CriticalSection mapAllocCS(heapAllocMapListMonitor);
-         heapAllocMap = new (PERSISTENT_NEW) PersistentUnorderedMap<allocEntry, size_t>(PersistentUnorderedMap<allocEntry, size_t>::allocator_type(*_persistentAllocator));
+         heapAllocMap = new (PERSISTENT_NEW) regionLog;
          // heapAllocMapMonitor = Monitor::create("JITCompilerHeapAllocMapMonitor");
          }
       }
@@ -72,8 +70,9 @@ Region::Region(const Region &prototype) :
       {
          if (is_heap)
          {
+         heapAllocMap = new (PERSISTENT_NEW) regionLog;
          // OMR::CriticalSection mapAllocCS(heapAllocMapListMonitor);
-         heapAllocMap = new (PERSISTENT_NEW) PersistentUnorderedMap<allocEntry, size_t>(PersistentUnorderedMap<allocEntry, size_t>::allocator_type(*_persistentAllocator));
+         // heapAllocMap = new (PERSISTENT_NEW) PersistentUnorderedMap<allocEntry, size_t>(PersistentUnorderedMap<allocEntry, size_t>::allocator_type(*_persistentAllocator));
          // heapAllocMapMonitor = Monitor::create("JITCompilerHeapAllocMapMonitor");
          }
       }
@@ -140,14 +139,14 @@ Region::allocate(size_t const size, void *hint)
          // OMR::CriticalSection cs(heapAllocMapMonitor);
          if (heapAllocMap)
             {
-            auto match = heapAllocMap->find(entry);
-            if (match != heapAllocMap->end())
+            auto match = heapAllocMap->allocMap->find(entry);
+            if (match != heapAllocMap->allocMap->end())
                {
                match->second += size;
                }
             else
                {
-               heapAllocMap->insert({entry, size});
+               heapAllocMap->allocMap->insert({entry, size});
                }
             }
          else
@@ -190,7 +189,8 @@ Region::init_alloc_map_list(TR::PersistentAllocator *allocator)
       if (OMR::Options::_collectBackTrace >= 1)
       {
       _persistentAllocator = allocator;
-      heapAllocMapList = new (PERSISTENT_NEW) PersistentUnorderedMap<size_t, PersistentUnorderedMap<allocEntry, size_t> *>(PersistentUnorderedMap<size_t, PersistentUnorderedMap<allocEntry, size_t> *>::allocator_type(*allocator));
+      heapAllocMapList = new (PERSISTENT_NEW) PersistentUnorderedMap<size_t, regionLog *>(PersistentUnorderedMap<size_t, regionLog *>::allocator_type(*allocator));
+      // heapAllocMapList = new (PERSISTENT_NEW) PersistentUnorderedMap<size_t, PersistentUnorderedMap<allocEntry, size_t> *>(PersistentUnorderedMap<size_t, PersistentUnorderedMap<allocEntry, size_t> *>::allocator_type(*allocator));
       // heapAllocMapList = new (PERSISTENT_NEW) PersistentUnorderedMap<size_t, void *>(PersistentUnorderedMap<size_t, void *>::allocator_type(*allocator));
       heapAllocMapListMonitor = Monitor::create("JITCompilerHeapAllocMapListMonitor");
       }
@@ -212,7 +212,7 @@ Region::print_alloc_entry()
             // fflush(stdout);
             printf("Method [%lu]\n", pair.first);
             // fflush(stdout);
-            for (auto &heapAllocPair : *(pair.second))
+            for (auto &heapAllocPair : pair.second->allocMap)
                {
                printf("Heap Allocated [%lu] bytes\n", heapAllocPair.second);
                // fflush(stdout);
@@ -224,7 +224,7 @@ Region::print_alloc_entry()
             }
          else
             {
-               for (auto &heapAllocPair : *(pair.second))
+               for (auto &heapAllocPair : pair.second->allocMap)
                {
                // printf("Heap Allocated [%lu] bytes\n", heapAllocPair.second);
                // fflush(stdout);

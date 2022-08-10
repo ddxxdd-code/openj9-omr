@@ -41,6 +41,12 @@ using PersistentUnorderedMapAllocator = TR::typed_allocator<std::pair<const K, V
 template<typename K, typename V, typename H = std::hash<K>, typename E = std::equal_to<K>>
 using PersistentUnorderedMap = std::unordered_map<K, V, H, E, PersistentUnorderedMapAllocator<K, V>>;
 
+struct regionLog
+   {
+   
+   PersistentUnorderedMap<allocEntry, size_t>(PersistentUnorderedMap<allocEntry, size_t>::allocator_type(*_persistentAllocator)) allocMap;
+   }
+
 struct allocEntry
    {
    int traceSize;
@@ -121,8 +127,8 @@ public:
    // Signifier for the type of memory
    bool is_heap = true;
    // UnorderedMap to collect allocation heaps in this region
-   PersistentUnorderedMap<allocEntry, size_t> *heapAllocMap;
-   PersistentUnorderedMap<allocEntry, size_t> *stackAllocMap;
+   regionLog *heapAllocMap;
+   // PersistentUnorderedMap<allocEntry, size_t> *heapAllocMap;
 
    /**
     * @brief A function template to create a Region-managed object instance.
