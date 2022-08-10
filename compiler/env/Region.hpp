@@ -45,7 +45,7 @@ struct regionLog
    {
    
    PersistentUnorderedMap<allocEntry, size_t>(PersistentUnorderedMap<allocEntry, size_t>::allocator_type(*_persistentAllocator)) allocMap;
-   }
+   };
 
 struct allocEntry
    {
