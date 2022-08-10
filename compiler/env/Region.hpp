@@ -165,9 +165,9 @@ public:
    static void print_alloc_entry();
 
    // Signifier for the type of memory
-   // bool is_heap = true;
+   bool is_heap = true;
    // UnorderedMap to collect allocation heaps in this region
-   struct regionLog *heapAllocMap;
+   struct regionLog *regionAllocMap;
    // PersistentUnorderedMap<allocEntry, size_t> *heapAllocMap;
    // PersistentUnorderedMap<allocEntry, size_t> *heapAllocMap;
 

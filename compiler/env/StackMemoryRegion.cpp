@@ -29,7 +29,7 @@ StackMemoryRegion::StackMemoryRegion(TR_Memory &trMemory) :
    _trMemory(trMemory),
    _previousStackRegion(_trMemory.registerStackRegion(*this))
    {
-      regionLog->is_heap = false;
+      is_heap = false;
    }
 
 StackMemoryRegion::~StackMemoryRegion() throw()

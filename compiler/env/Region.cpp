@@ -27,9 +27,11 @@
 #include "env/TRMemory.hpp"
 #include "infra/Monitor.hpp"
 #include "control/OMROptions.hpp"
+#include "compile/Compilation.hpp"
 #include <unordered_map>
 #include <libunwind.h>
 #include <execinfo.h>
+#include <string.h>
 
 // Constructor for regionLog to keep the log of each region object
 regionLog::regionLog(TR::PersistentAllocator *allocator)
@@ -61,7 +63,7 @@ Region::Region(TR::SegmentProvider &segmentProvider, TR::RawAllocator rawAllocat
    if (OMR::Options::_collectBackTrace >= 1)
       {
       // OMR::CriticalSection mapAllocCS(heapAllocMapListMonitor);
-      heapAllocMap = new (PERSISTENT_NEW) regionLog(_persistentAllocator);
+      regionAllocMap = new (PERSISTENT_NEW) regionLog(_persistentAllocator);
       // heapAllocMap->allocMap = new (PERSISTENT_NEW) PersistentUnorderedMap<allocEntry, size_t>(PersistentUnorderedMap<allocEntry, size_t>::allocator_type(*_persistentAllocator));
       // heapAllocMapMonitor = Monitor::create("JITCompilerHeapAllocMapMonitor");
       }
@@ -77,7 +79,7 @@ Region::Region(const Region &prototype) :
    {
    if (OMR::Options::_collectBackTrace >= 1)
       {
-      heapAllocMap = new (PERSISTENT_NEW) regionLog(_persistentAllocator);
+      regionAllocMap = new (PERSISTENT_NEW) regionLog(_persistentAllocator);
       // heapAllocMap = new (PERSISTENT_NEW) struct regionLog;
       // heapAllocMap->allocMap = new (PERSISTENT_NEW) PersistentUnorderedMap<allocEntry, size_t>(PersistentUnorderedMap<allocEntry, size_t>::allocator_type(*_persistentAllocator));
       // heapAllocMap = new (PERSISTENT_NEW) PersistentUnorderedMap<regionLog, size_t>(PersistentUnorderedMap<regionLog, size_t>::allocator_type(*_persistentAllocator));
@@ -95,14 +97,14 @@ Region::~Region() throw()
          if (heapAllocMapList && heapAllocMapListMonitor)
             {
             OMR::CriticalSection listInsertCS(heapAllocMapListMonitor);
-            heapAllocMapList->insert({total_method_compiled, heapAllocMap});
+            heapAllocMapList->insert({total_method_compiled, regionAllocMap});
             }
          else
             {
             printf("heapAllocMapList unintialized\n");
             }    
       total_method_compiled += 1;
-      heapAllocMap = NULL;
+      regionAllocMap = NULL;
       }
    /*
     * Destroy all object instances that depend on the region
@@ -131,10 +133,22 @@ Region::~Region() throw()
 void *
 Region::allocate(size_t const size, void *hint)
    {
-      if (OMR::Options::_collectBackTrace >= 1)
+   if (OMR::Options::_collectBackTrace >= 1)
       {
-      // Add compilation information to regionLog
-      
+      if (is_heap != regionAllocMap->is_heap)
+         {
+         regionAllocMap->is_heap = is_heap;
+         }
+      // Add compilation information to regionAllocMap
+      if (regionAllocMap->compInfo == NULL)
+         {
+         if (TR::comp())
+            {
+            size_t length = strlen(TR::comp()->signature()) + 1;
+            regionAllocMap->compInfo = (char *) _persistentAllocator->allocate(length);
+            memcpy(regionAllocMap->compInfo, TR::comp()->signature(), length);
+            }
+         }
       // Backtrace heap allocation
       // printf("Heap allocate [%u] bytes\n", size);
       // fflush(stdout);
@@ -143,21 +157,21 @@ Region::allocate(size_t const size, void *hint)
       entry.traceSize = unw_backtrace(entry.trace, MAX_BACKTRACE_SIZE);
       // entry->traceSize = backtrace(entry->trace, MAX_BACKTRACE_SIZE);
       // OMR::CriticalSection cs(heapAllocMapMonitor);
-      if (heapAllocMap)
+      if (regionAllocMap)
          {
-         auto match = heapAllocMap->allocMap->find(entry);
-         if (match != heapAllocMap->allocMap->end())
+         auto match = regionAllocMap->allocMap->find(entry);
+         if (match != regionAllocMap->allocMap->end())
             {
             match->second += size;
             }
          else
             {
-            heapAllocMap->allocMap->insert({entry, size});
+            regionAllocMap->allocMap->insert({entry, size});
             }
          }
       else
          {
-         printf("heapAllocMap is not built\n");
+         printf("regionAllocMap is not built\n");
          }
       // backtrace_symbols_fd(entry->trace, entry->traceSize, fileno(stdout));
       // printf("=== end ===\n");
