@@ -31,6 +31,11 @@
 #include <libunwind.h>
 #include <execinfo.h>
 
+regionLog::regionLog()
+   {
+   allocMap = new (PERSISTENT_NEW) PersistentUnorderedMap<allocEntry, size_t>();
+   }
+
 namespace TR {
 
 // static PersistentUnorderedMap<size_t, void *> *heapAllocMapList = NULL;
@@ -146,7 +151,7 @@ Region::allocate(size_t const size, void *hint)
                }
             else
                {
-               heapAllocMap->allocMap->insert({entry, size});
+               heapAllocMap->allocMap.insert({entry, size});
                }
             }
          else

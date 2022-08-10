@@ -41,12 +41,6 @@ using PersistentUnorderedMapAllocator = TR::typed_allocator<std::pair<const K, V
 template<typename K, typename V, typename H = std::hash<K>, typename E = std::equal_to<K>>
 using PersistentUnorderedMap = std::unordered_map<K, V, H, E, PersistentUnorderedMapAllocator<K, V>>;
 
-struct regionLog
-   {
-   
-   PersistentUnorderedMap<allocEntry, size_t>(PersistentUnorderedMap<allocEntry, size_t>::allocator_type(*_persistentAllocator)) allocMap;
-   };
-
 struct allocEntry
    {
    int traceSize;
@@ -61,6 +55,47 @@ struct allocEntry
          return memcmp(trace, other.trace, sizeof(void *)*traceSize) == 0;
       }
    };
+
+namespace std {
+  template <>
+  struct hash<allocEntry>
+   {
+   std::size_t operator()(const allocEntry& k) const
+      {
+      using std::hash;
+      size_t result = hash<int>()(k.traceSize);
+      for (int i = 0; i < k.traceSize; i++) 
+         {
+         result ^= hash<void *>()(k.trace[i]);
+         }
+      return result;
+      }
+   };
+}
+
+class regionLog
+   {
+   public:
+      PersistentUnorderedMap<allocEntry, size_t> allocMap;
+   
+      regionLog();
+   // PersistentUnorderedMap<allocEntry, size_t>(PersistentUnorderedMap<allocEntry, size_t>::allocator_type(*_persistentAllocator)) allocMap;
+   // bool operator==(const regionLog &other) const 
+   //    {
+   //       return false;
+   //    }
+   };
+namespace std {
+   template<>
+   struct hash<regionLog>
+   {
+   std::size_t operator()(const regionLog& k) const
+      {
+      using std::hash;
+      return hash<const void *>()(&k);
+      }
+   };
+}
 
 namespace TR {
 
@@ -215,20 +250,4 @@ TR::Region::create(const T &value)
    return instance->value();
    }
    
-namespace std {
-  template <>
-  struct hash<allocEntry>
-   {
-   std::size_t operator()(const allocEntry& k) const
-      {
-      using std::hash;
-      size_t result = hash<int>()(k.traceSize);
-      for (int i = 0; i < k.traceSize; i++) 
-         {
-         result ^= hash<void *>()(k.trace[i]);
-         }
-      return result;
-      }
-   };
-}
 #endif // OMR_REGION_HPP
