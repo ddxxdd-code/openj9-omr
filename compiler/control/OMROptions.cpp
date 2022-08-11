@@ -1290,8 +1290,8 @@ TR::OptionTable OMR::Options::_jitOptions[] = {
    {"x86UseMFENCE",   "M\tEnable to use mfence to handle volatile store", SET_OPTION_BIT(TR_X86UseMFENCE), "F", NOT_IN_SUBSET},
    {"zCollectBackTrace=", "D<nnn>\tNumber 0or1or2or3or4",
         TR::Options::setStaticNumeric, (intptr_t)&OMR::Options::_collectBackTrace, 0, "F%d", NOT_IN_SUBSET},
-   {"zNoPrintBackTrace=", "D<nnn>\tNumber 0or1or2",
-        TR::Options::setStaticNumeric, (intptr_t)&OMR::Options::_noPrintBackTrace, 2, "F%d", NOT_IN_SUBSET},
+   {"zNoPrintBackTrace=", "D<nnn>\tNumber 0or1or2or3",
+        TR::Options::setStaticNumeric, (intptr_t)&OMR::Options::_noPrintBackTrace, 3, "F%d", NOT_IN_SUBSET},
    {NULL}
 };
 
