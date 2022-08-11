@@ -37,7 +37,7 @@
 // _collectBackTrace:   0: no collection (no call to backtrace), 1: run backtrace but no insertion to universal, 
 //                      2: backtrace stack only (backtrace only stack regions), 3: backtrace heap only, 
 //                      4: backtrace stack and heap
-// _noPrintBackTrace:   0: print, 1: call symbols no fd in loop, 2: no print but loop at the end, 3: nothing at the end
+// _printBackTrace:     0: nothing at the end, 1: no print but loop at the end, 2: call symbols no fd in loop, 3: print
 
 // Constructor for regionLog to keep the log of each region object
 regionLog::regionLog(TR::PersistentAllocator *allocator)
@@ -219,7 +219,7 @@ Region::init_alloc_map_list(TR::PersistentAllocator *allocator)
 void
 Region::print_alloc_entry() 
    {
-   if (OMR::Options::_noPrintBackTrace <= 2)
+   if (OMR::Options::_printBackTrace > 0)
       {
       if (!heapAllocMapList) {
          printf("no map to print\n");
@@ -227,11 +227,19 @@ Region::print_alloc_entry()
       }
       for (auto &pair : *heapAllocMapList) 
          {
-         if (OMR::Options::_noPrintBackTrace == 0)  
+         if (OMR::Options::_printBackTrace == 3)  
             {
             // fflush(stdout);
             printf("Method [%lu]\n", pair.first);
+            if (pair.second->compInfo)
+               {
+               printf("Info: %s\n", pair.second->compInfo);
+               }
+            printf("Region Construction Back Trace:\n");
             // fflush(stdout);
+            backtrace_symbols_fd((void **)pair.second->regionTrace, pair.second->regionTraceSize, fileno(stdout));
+            fflush(stdout);
+            printf("==== Allocations ====\n");
             for (auto &heapAllocPair : *(pair.second->allocMap))
                {
                if (pair.second->is_heap)
@@ -242,14 +250,14 @@ Region::print_alloc_entry()
                   {
                   printf("Stack Allocated [%lu] bytes\n", heapAllocPair.second);
                   }
-               fflush(stdout);
+               // fflush(stdout);
                backtrace_symbols_fd((void **)heapAllocPair.first.trace, heapAllocPair.first.traceSize, fileno(stdout));
                fflush(stdout);
                }
             printf("=== End ===\n");
             // fflush(stdout);
             }
-         else if (OMR::Options::_noPrintBackTrace == 1)
+         else if (OMR::Options::_printBackTrace == 2)
             {
                for (auto &heapAllocPair : *(pair.second->allocMap))
                {
