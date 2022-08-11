@@ -236,9 +236,9 @@ Region::print_alloc_entry()
                printf("Info: %s\n", pair.second->compInfo);
                }
             printf("Region Construction Back Trace:\n");
-            // fflush(stdout);
-            backtrace_symbols_fd((void **)pair.second->regionTrace, pair.second->regionTraceSize, fileno(stdout));
             fflush(stdout);
+            backtrace_symbols_fd((void **)pair.second->regionTrace, pair.second->regionTraceSize, fileno(stdout));
+            // fflush(stdout);
             printf("==== Allocations ====\n");
             for (auto &heapAllocPair : *(pair.second->allocMap))
                {
@@ -250,9 +250,9 @@ Region::print_alloc_entry()
                   {
                   printf("Stack Allocated [%lu] bytes\n", heapAllocPair.second);
                   }
-               // fflush(stdout);
-               backtrace_symbols_fd((void **)heapAllocPair.first.trace, heapAllocPair.first.traceSize, fileno(stdout));
                fflush(stdout);
+               backtrace_symbols_fd((void **)heapAllocPair.first.trace, heapAllocPair.first.traceSize, fileno(stdout));
+               // fflush(stdout);
                }
             printf("=== End ===\n");
             // fflush(stdout);
