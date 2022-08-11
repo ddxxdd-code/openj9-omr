@@ -33,6 +33,12 @@
 #include <execinfo.h>
 #include <string.h>
 
+// Note for instrumentation:
+// _collectBackTrace:   0: no collection (no call to backtrace), 1: run backtrace but no insertion to universal, 
+//                      2: backtrace stack only (backtrace only stack regions), 3: backtrace heap only, 
+//                      4: backtrace stack and heap
+// _noPrintBackTrace:   0: print, 1: call symbols no fd in loop, 2: no print but loop at the end, 3: nothing at the end
+
 // Constructor for regionLog to keep the log of each region object
 regionLog::regionLog(TR::PersistentAllocator *allocator)
    {
@@ -91,7 +97,7 @@ Region::Region(const Region &prototype) :
 
 Region::~Region() throw()
    {
-      if (OMR::Options::_collectBackTrace >= 1)
+      if (OMR::Options::_collectBackTrace >= 2)
       {
          // add heapAllocMap to heapAllocMapList
          if (heapAllocMapList && heapAllocMapListMonitor)
@@ -149,33 +155,28 @@ Region::allocate(size_t const size, void *hint)
             memcpy(regionAllocMap->compInfo, TR::comp()->signature(), length);
             }
          }
-      // Backtrace heap allocation
-      // printf("Heap allocate [%u] bytes\n", size);
-      // fflush(stdout);
-      // struct allocEntry *entry = new(PERSISTENT_NEW) allocEntry;
-      struct allocEntry entry;
-      entry.traceSize = unw_backtrace(entry.trace, MAX_BACKTRACE_SIZE);
-      // entry->traceSize = backtrace(entry->trace, MAX_BACKTRACE_SIZE);
-      // OMR::CriticalSection cs(heapAllocMapMonitor);
-      if (regionAllocMap)
+      // Backtrace allocation
+      if (OMR::Options::_collectBackTrace >= 4 || (OMR::Options::_collectBackTrace == 2 && !is_heap) || (OMR::Options::_collectBackTrace == 3 && is_heap))
          {
-         auto match = regionAllocMap->allocMap->find(entry);
-         if (match != regionAllocMap->allocMap->end())
+         struct allocEntry entry;
+         entry.traceSize = unw_backtrace(entry.trace, MAX_BACKTRACE_SIZE);
+         if (regionAllocMap)
             {
-            match->second += size;
+            auto match = regionAllocMap->allocMap->find(entry);
+            if (match != regionAllocMap->allocMap->end())
+               {
+               match->second += size;
+               }
+            else
+               {
+               regionAllocMap->allocMap->insert({entry, size});
+               }
             }
          else
             {
-            regionAllocMap->allocMap->insert({entry, size});
+            printf("regionAllocMap is not built\n");
             }
          }
-      else
-         {
-         printf("regionAllocMap is not built\n");
-         }
-      // backtrace_symbols_fd(entry->trace, entry->traceSize, fileno(stdout));
-      // printf("=== end ===\n");
-      // fflush(stdout);
       }
    size_t const roundedSize = round(size);
    if (_currentSegment.get().remaining() >= roundedSize)
@@ -218,7 +219,7 @@ Region::init_alloc_map_list(TR::PersistentAllocator *allocator)
 void
 Region::print_alloc_entry() 
    {
-   if (OMR::Options::_noPrintBackTrace > 0)
+   if (OMR::Options::_noPrintBackTrace <= 2)
       {
       if (!heapAllocMapList) {
          printf("no map to print\n");
@@ -226,7 +227,7 @@ Region::print_alloc_entry()
       }
       for (auto &pair : *heapAllocMapList) 
          {
-         if (OMR::Options::_noPrintBackTrace == 2)
+         if (OMR::Options::_noPrintBackTrace == 0)  
             {
             // fflush(stdout);
             printf("Method [%lu]\n", pair.first);
@@ -241,14 +242,14 @@ Region::print_alloc_entry()
                   {
                   printf("Stack Allocated [%lu] bytes\n", heapAllocPair.second);
                   }
-               // fflush(stdout);
+               fflush(stdout);
                backtrace_symbols_fd((void **)heapAllocPair.first.trace, heapAllocPair.first.traceSize, fileno(stdout));
-               // fflush(stdout);
+               fflush(stdout);
                }
             printf("=== End ===\n");
-            fflush(stdout);
+            // fflush(stdout);
             }
-         else
+         else if (OMR::Options::_noPrintBackTrace == 1)
             {
                for (auto &heapAllocPair : *(pair.second->allocMap))
                {

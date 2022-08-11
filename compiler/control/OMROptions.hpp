@@ -1791,10 +1791,10 @@ public:
    static uint32_t _cpuUsageCircularBufferSize;
 
    // For collectBackTrace control
-   // 0: no collection, 1: collect back trace with no insertion, 2: collect and insert
+   // 0: no collection, 1: collect back trace with no insertion, 2: collect stack only, 3: colledct heap only, 4: collect all
    static uint32_t _collectBackTrace;
    // Control if backtrace to be printed
-   // 0: print 1: silent
+   // 0: print 1: loop with symbols no output to fd, 2: loop but no call in loop, 3: do nothing
    static uint32_t _noPrintBackTrace;
 
    // Debug counter insertion options

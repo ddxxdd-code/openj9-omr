@@ -1288,10 +1288,10 @@ TR::OptionTable OMR::Options::_jitOptions[] = {
    {"waitOnCompilationQueue",        "M\tPerform synchronous wait until compilation queue empty. Primarily for use with Compiler.command", SET_OPTION_BIT(TR_WaitBit), "F", NOT_IN_SUBSET},
    {"x86HLE",         "C\tEnable haswell hardware lock elision", SET_OPTION_BIT(TR_X86HLE), "F"},
    {"x86UseMFENCE",   "M\tEnable to use mfence to handle volatile store", SET_OPTION_BIT(TR_X86UseMFENCE), "F", NOT_IN_SUBSET},
-   {"zCollectBackTrace=", "D<nnn>\tNumber 0or1or2",
+   {"zCollectBackTrace=", "D<nnn>\tNumber 0or1or2or3or4",
         TR::Options::setStaticNumeric, (intptr_t)&OMR::Options::_collectBackTrace, 0, "F%d", NOT_IN_SUBSET},
-   {"zNoPrintBackTrace=", "D<nnn>\tNumber 0or1",
-        TR::Options::setStaticNumeric, (intptr_t)&OMR::Options::_noPrintBackTrace, 0, "F%d", NOT_IN_SUBSET},
+   {"zNoPrintBackTrace=", "D<nnn>\tNumber 0or1or2",
+        TR::Options::setStaticNumeric, (intptr_t)&OMR::Options::_noPrintBackTrace, 2, "F%d", NOT_IN_SUBSET},
    {NULL}
 };
 
