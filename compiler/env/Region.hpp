@@ -45,7 +45,7 @@ using PersistentUnorderedMap = std::unordered_map<K, V, H, E, PersistentUnordere
 
 struct allocEntry
    {
-   int traceSize;
+   // int traceSize;
    void *trace[MAX_BACKTRACE_SIZE];
 
    bool operator==(const allocEntry &other) const 
@@ -54,7 +54,7 @@ struct allocEntry
          //    {
          //    return false;
          //    }
-         return memcmp(trace, other.trace, sizeof(void *)*traceSize) == 0;
+         return memcmp(trace, other.trace, sizeof(void *)*MAX_BACKTRACE_SIZE) == 0;
       }
    };
 
