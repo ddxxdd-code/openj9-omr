@@ -256,21 +256,31 @@ Region::print_alloc_entry()
             // Allocated size for heap
             // 
             // printf("Method [%lu]\n", pair.first);
+            if ((!pair.second->is_heap && OMR::Options::_collectBackTrace == 3) || (pair.second->is_heap && OMR::Options::_collectBackTrace == 2))
+               {
+               continue;
+               }
             if (pair.second->compInfo)
                {
                fprintf(out_file, "%s\n", pair.second->compInfo);
+               }
+            else
+               {
+               // no signature means no allocation, skip the empty entry
+               // fprintf(out_file, "Method has no signature\n");
+               continue;
                }
             // printf("Region Construction Back Trace:\n");
             // fflush(stdout);
             // 0 for stack, 1 for heap
             if (pair.second->is_heap)
-                  {
-                  fprintf(out_file, "1 ");
-                  }
-               else
-                  {
-                  fprintf(out_file, "0 ");
-                  }
+               {
+               fprintf(out_file, "1 ");
+               }
+            else
+               {
+               fprintf(out_file, "0 ");
+               }
             char **temp = backtrace_symbols((void **)pair.second->regionTrace, REGION_BACKTRACE_DEPTH);
             for (int i = 0; i < REGION_BACKTRACE_DEPTH; i++)
                {
