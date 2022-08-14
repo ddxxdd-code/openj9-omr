@@ -44,21 +44,15 @@ regionLog::regionLog(TR::PersistentAllocator *allocator)
    {
    // in heap region, is_heap will be kept true while stack region will rewrite this to false on creation
    is_heap = true;
-   // collect backtrace of the constructor of the region
-   void *trace[REGION_BACKTRACE_DEPTH + 1];
-   unw_backtrace(trace, REGION_BACKTRACE_DEPTH + 1);
-   memcpy(regionTrace, &trace[1], REGION_BACKTRACE_DEPTH * sizeof(void *));
    compInfo = NULL;
    allocMap = new (PERSISTENT_NEW) PersistentUnorderedMap<allocEntry, size_t>(PersistentUnorderedMap<allocEntry, size_t>::allocator_type(*allocator));
    }
 
 namespace TR {
 
-// static PersistentUnorderedMap<size_t, void *> *heapAllocMapList = NULL;
-static PersistentUnorderedMap<size_t, regionLog *> *heapAllocMapList = NULL;
+static PersistentVector<regionLog *> *heapAllocMapList = NULL;
 static Monitor *heapAllocMapListMonitor;
 static PersistentAllocator *_persistentAllocator = NULL;
-size_t total_method_compiled = 0;
 
 Region::Region(TR::SegmentProvider &segmentProvider, TR::RawAllocator rawAllocator) :
    _bytesAllocated(0),
@@ -70,10 +64,11 @@ Region::Region(TR::SegmentProvider &segmentProvider, TR::RawAllocator rawAllocat
    {
    if (OMR::Options::_collectBackTrace >= 1)
       {
-      // OMR::CriticalSection mapAllocCS(heapAllocMapListMonitor);
       regionAllocMap = new (PERSISTENT_NEW) regionLog(_persistentAllocator);
-      // heapAllocMap->allocMap = new (PERSISTENT_NEW) PersistentUnorderedMap<allocEntry, size_t>(PersistentUnorderedMap<allocEntry, size_t>::allocator_type(*_persistentAllocator));
-      // heapAllocMapMonitor = Monitor::create("JITCompilerHeapAllocMapMonitor");
+      // collect backtrace of the constructor of the region
+      void *trace[REGION_BACKTRACE_DEPTH + 1];
+      unw_backtrace(trace, REGION_BACKTRACE_DEPTH + 1);
+      memcpy(regionAllocMap->regionTrace, &trace[1], REGION_BACKTRACE_DEPTH * sizeof(void *));
       }
    }
 
@@ -88,12 +83,10 @@ Region::Region(const Region &prototype) :
    if (OMR::Options::_collectBackTrace >= 1)
       {
       regionAllocMap = new (PERSISTENT_NEW) regionLog(_persistentAllocator);
-      // heapAllocMap = new (PERSISTENT_NEW) struct regionLog;
-      // heapAllocMap->allocMap = new (PERSISTENT_NEW) PersistentUnorderedMap<allocEntry, size_t>(PersistentUnorderedMap<allocEntry, size_t>::allocator_type(*_persistentAllocator));
-      // heapAllocMap = new (PERSISTENT_NEW) PersistentUnorderedMap<regionLog, size_t>(PersistentUnorderedMap<regionLog, size_t>::allocator_type(*_persistentAllocator));
-      // OMR::CriticalSection mapAllocCS(heapAllocMapListMonitor);
-      // heapAllocMap = new (PERSISTENT_NEW) PersistentUnorderedMap<allocEntry, size_t>(PersistentUnorderedMap<allocEntry, size_t>::allocator_type(*_persistentAllocator));
-      // heapAllocMapMonitor = Monitor::create("JITCompilerHeapAllocMapMonitor");
+      // collect backtrace of the constructor of the region
+      void *trace[REGION_BACKTRACE_DEPTH + 1];
+      unw_backtrace(trace, REGION_BACKTRACE_DEPTH + 1);
+      memcpy(regionAllocMap->regionTrace, &trace[1], REGION_BACKTRACE_DEPTH * sizeof(void *));
       }
    }
 
@@ -105,13 +98,12 @@ Region::~Region() throw()
          if (heapAllocMapList && heapAllocMapListMonitor)
             {
             OMR::CriticalSection listInsertCS(heapAllocMapListMonitor);
-            heapAllocMapList->insert({total_method_compiled, regionAllocMap});
+            heapAllocMapList->push_back(regionAllocMap);
             }
          else
             {
             printf("heapAllocMapList unintialized\n");
-            }    
-         total_method_compiled += 1;
+            }
          regionAllocMap = NULL;
          }
    /*
@@ -213,9 +205,7 @@ Region::init_alloc_map_list(TR::PersistentAllocator *allocator)
       if (OMR::Options::_collectBackTrace >= 1)
       {
       _persistentAllocator = allocator;
-      heapAllocMapList = new (PERSISTENT_NEW) PersistentUnorderedMap<size_t, regionLog *>(PersistentUnorderedMap<size_t, regionLog *>::allocator_type(*allocator));
-      // heapAllocMapList = new (PERSISTENT_NEW) PersistentUnorderedMap<size_t, PersistentUnorderedMap<allocEntry, size_t> *>(PersistentUnorderedMap<size_t, PersistentUnorderedMap<allocEntry, size_t> *>::allocator_type(*allocator));
-      // heapAllocMapList = new (PERSISTENT_NEW) PersistentUnorderedMap<size_t, void *>(PersistentUnorderedMap<size_t, void *>::allocator_type(*allocator));
+      heapAllocMapList = new (PERSISTENT_NEW) PersistentVector<regionLog *>(PersistentVector<regionLog *>::allocator_type(*allocator));
       heapAllocMapListMonitor = Monitor::create("JITCompilerHeapAllocMapListMonitor");
       }
    }
@@ -244,7 +234,7 @@ Region::print_alloc_entry()
          return;
          }
       std::FILE *out_file = fopen((const char *)OMR::Options::_backTraceFileName,"w");
-      for (auto &pair : *heapAllocMapList) 
+      for (auto &region : *heapAllocMapList) 
          {
          // Here we assume backTraceFile is initialized.
          if (OMR::Options::_printBackTrace == 2)  
@@ -254,26 +244,21 @@ Region::print_alloc_entry()
             // Compiled method's info
             // Region backtrace (3 lines)
             // Allocated size for heap
-            // 
-            // printf("Method [%lu]\n", pair.first);
-            if ((!pair.second->is_heap && OMR::Options::_collectBackTrace == 3) || (pair.second->is_heap && OMR::Options::_collectBackTrace == 2))
+            if ((!region->is_heap && OMR::Options::_collectBackTrace == 3) || (region->is_heap && OMR::Options::_collectBackTrace == 2))
                {
                continue;
                }
-            if (pair.second->compInfo)
+            if (region->compInfo)
                {
-               fprintf(out_file, "%s\n", pair.second->compInfo);
+               fprintf(out_file, "%s\n", region->compInfo);
                }
             else
                {
                // no signature means no allocation, skip the empty entry
-               // fprintf(out_file, "Method has no signature\n");
                continue;
                }
-            // printf("Region Construction Back Trace:\n");
-            // fflush(stdout);
             // 0 for stack, 1 for heap
-            if (pair.second->is_heap)
+            if (region->is_heap)
                {
                fprintf(out_file, "1 ");
                }
@@ -281,41 +266,23 @@ Region::print_alloc_entry()
                {
                fprintf(out_file, "0 ");
                }
-            char **temp = backtrace_symbols((void **)pair.second->regionTrace, REGION_BACKTRACE_DEPTH);
+            char **temp = backtrace_symbols((void **)region->regionTrace, REGION_BACKTRACE_DEPTH);
             for (int i = 0; i < REGION_BACKTRACE_DEPTH; i++)
                {
                put_offset(out_file, temp[i]);
                }
             fprintf(out_file, "\n");
-
-            // fflush(stdout);
-            // printf("==== Allocations ====\n");
-            for (auto &allocPair : *(pair.second->allocMap))
+            for (auto &allocPair : *(region->allocMap))
                {
-               
-               // fflush(stdout);
-               fprintf(out_file, "%ld ", allocPair.second);
+               fprintf(out_file, "%zu ", allocPair.second);
                temp = backtrace_symbols((void **)allocPair.first.trace, MAX_BACKTRACE_SIZE);
                for (int i = 0; i < MAX_BACKTRACE_SIZE; i++)
                   {
                   put_offset(out_file, temp[i]);
                   }
                fprintf(out_file, "\n");
-               // fflush(stdout);
                }
-            // printf("=== End ===\n");
-            // fflush(stdout);
             }
-         // else if (OMR::Options::_printBackTrace == 2)
-         //    {
-         //       for (auto &heapAllocPair : *(pair.second->allocMap))
-         //       {
-         //       // printf("Heap Allocated [%lu] bytes\n", heapAllocPair.second);
-         //       // fflush(stdout);
-         //       char **temp = backtrace_symbols((void **)heapAllocPair.first.trace, heapAllocPair.first.traceSize);
-         //       // fflush(stdout);
-         //       }
-         //    }
          }
       fclose(out_file);
       }

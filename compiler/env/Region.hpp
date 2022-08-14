@@ -33,6 +33,7 @@
 #include "env/RawAllocator.hpp"
 #include "env/PersistentAllocator.hpp"
 #include <unordered_map>
+#include <vector>
 
 #define MAX_BACKTRACE_SIZE 10
 #define REGION_BACKTRACE_DEPTH 3
@@ -42,6 +43,10 @@ template<typename K, typename V>
 using PersistentUnorderedMapAllocator = TR::typed_allocator<std::pair<const K, V>, TR::PersistentAllocator &>;
 template<typename K, typename V, typename H = std::hash<K>, typename E = std::equal_to<K>>
 using PersistentUnorderedMap = std::unordered_map<K, V, H, E, PersistentUnorderedMapAllocator<K, V>>;
+template<typename K>
+using PersistentVectorAllocator = TR::typed_allocator<K, TR::PersistentAllocator &>;
+template<typename K>
+using PersistentVector = std::vector<K, PersistentVectorAllocator<K>>;
 
 struct allocEntry
    {
@@ -50,10 +55,6 @@ struct allocEntry
 
    bool operator==(const allocEntry &other) const 
       {
-         // if(traceSize != other.traceSize)
-         //    {
-         //    return false;
-         //    }
          return memcmp(trace, other.trace, sizeof(void *)*MAX_BACKTRACE_SIZE) == 0;
       }
    };
@@ -85,7 +86,6 @@ class regionLog
       char *compInfo;
 
       PersistentUnorderedMap<allocEntry, size_t> *allocMap;
-      // PersistentUnorderedMap<allocEntry, size_t>(PersistentUnorderedMap<allocEntry, size_t>::allocator_type(*_persistentAllocator)) allocMap;
       regionLog(TR::PersistentAllocator *allocator);
       bool operator==(const regionLog &other) const 
          {
@@ -93,17 +93,17 @@ class regionLog
          }
       };
 
-namespace std {
-   template<>
-   struct hash<regionLog>
-   {
-   std::size_t operator()(const regionLog& k) const
-      {
-      using std::hash;
-      return hash<const void *>()(&k);
-      }
-   };
-}
+// namespace std {
+//    template<>
+//    struct hash<regionLog>
+//    {
+//    std::size_t operator()(const regionLog& k) const
+//       {
+//       using std::hash;
+//       return hash<const void *>()(&k);
+//       }
+//    };
+// }
 
 namespace TR {
 
