@@ -37,7 +37,7 @@
 // _collectBackTrace:   0: no collection (no call to backtrace), 1: run backtrace but no insertion to universal, 
 //                      2: backtrace stack only (backtrace only stack regions), 3: backtrace heap only, 
 //                      4: backtrace stack and heap
-// _printBackTrace:     0: nothing at the end, 1: no print but loop at the end, 2: call symbols no fd in loop, 3: print
+// _printBackTrace:     0: nothing at the end, 1: no print but loop at the end, 2: print
 
 // Constructor for regionLog to keep the log of each region object
 regionLog::regionLog(TR::PersistentAllocator *allocator)
@@ -45,7 +45,9 @@ regionLog::regionLog(TR::PersistentAllocator *allocator)
    // in heap region, is_heap will be kept true while stack region will rewrite this to false on creation
    is_heap = true;
    // collect backtrace of the constructor of the region
-   regionTraceSize = unw_backtrace(regionTrace, MAX_BACKTRACE_SIZE);
+   void *trace[REGION_BACKTRACE_DEPTH + 1];
+   unw_backtrace(trace, REGION_BACKTRACE_DEPTH + 1);
+   memcpy(regionTrace, &trace[1], REGION_BACKTRACE_DEPTH * sizeof(void *));
    compInfo = NULL;
    allocMap = new (PERSISTENT_NEW) PersistentUnorderedMap<allocEntry, size_t>(PersistentUnorderedMap<allocEntry, size_t>::allocator_type(*allocator));
    }
@@ -98,7 +100,7 @@ Region::Region(const Region &prototype) :
 Region::~Region() throw()
    {
       if (OMR::Options::_collectBackTrace >= 2)
-      {
+         {
          // add heapAllocMap to heapAllocMapList
          if (heapAllocMapList && heapAllocMapListMonitor)
             {
@@ -109,9 +111,9 @@ Region::~Region() throw()
             {
             printf("heapAllocMapList unintialized\n");
             }    
-      total_method_compiled += 1;
-      regionAllocMap = NULL;
-      }
+         total_method_compiled += 1;
+         regionAllocMap = NULL;
+         }
    /*
     * Destroy all object instances that depend on the region
     * to manage their lifetimes.
@@ -159,7 +161,9 @@ Region::allocate(size_t const size, void *hint)
       if (OMR::Options::_collectBackTrace >= 4 || (OMR::Options::_collectBackTrace == 2 && !is_heap) || (OMR::Options::_collectBackTrace == 3 && is_heap))
          {
          struct allocEntry entry;
-         entry.traceSize = unw_backtrace(entry.trace, MAX_BACKTRACE_SIZE);
+         void *trace[MAX_BACKTRACE_SIZE + 1];
+         unw_backtrace(trace, MAX_BACKTRACE_SIZE + 1);
+         memcpy(entry.trace, &trace[1], MAX_BACKTRACE_SIZE * sizeof(void *));
          if (regionAllocMap)
             {
             auto match = regionAllocMap->allocMap->find(entry);
@@ -216,58 +220,94 @@ Region::init_alloc_map_list(TR::PersistentAllocator *allocator)
       }
    }
 
+static void
+put_offset(std::FILE *file, char *line)
+   {
+   if (strstr(line, TARGET_EXECUTABLE_FILE) != NULL)
+      {
+      // Warning: here we make the assumption that the line is of the format <executable_file>(+0x<offset>)
+      // without checking the format, doing below lines is risky
+      // We make such assumption to reduce the cost of checking each time for a faster output.
+      *strchr(line, ')') = '\0';
+      fprintf(file, "%s ", strchr(line, '(') + 4);
+      }
+   }
+
 void
 Region::print_alloc_entry() 
    {
    if (OMR::Options::_printBackTrace > 0)
       {
-      if (!heapAllocMapList) {
-         printf("no map to print\n");
+      if (!heapAllocMapList) 
+         {
+         fprintf(stderr, "no map to print\n");
          return;
-      }
+         }
+      std::FILE *out_file = fopen((const char *)OMR::Options::_backTraceFileName,"w");
       for (auto &pair : *heapAllocMapList) 
          {
-         if (OMR::Options::_printBackTrace == 3)  
+         // Here we assume backTraceFile is initialized.
+         if (OMR::Options::_printBackTrace == 2)  
             {
             // fflush(stdout);
-            printf("Method [%lu]\n", pair.first);
+            // Output to selected file in the format:
+            // Compiled method's info
+            // Region backtrace (3 lines)
+            // Allocated size for heap
+            // 
+            // printf("Method [%lu]\n", pair.first);
             if (pair.second->compInfo)
                {
-               printf("Info: %s\n", pair.second->compInfo);
+               fprintf(out_file, "%s\n", pair.second->compInfo);
                }
-            printf("Region Construction Back Trace:\n");
-            fflush(stdout);
-            backtrace_symbols_fd((void **)pair.second->regionTrace, pair.second->regionTraceSize, fileno(stdout));
+            // printf("Region Construction Back Trace:\n");
             // fflush(stdout);
-            printf("==== Allocations ====\n");
-            for (auto &heapAllocPair : *(pair.second->allocMap))
-               {
-               if (pair.second->is_heap)
+            // 0 for stack, 1 for heap
+            if (pair.second->is_heap)
                   {
-                  printf("Heap Allocated [%lu] bytes\n", heapAllocPair.second);
+                  fprintf(out_file, "1 ");
                   }
                else
                   {
-                  printf("Stack Allocated [%lu] bytes\n", heapAllocPair.second);
+                  fprintf(out_file, "0 ");
                   }
-               fflush(stdout);
-               backtrace_symbols_fd((void **)heapAllocPair.first.trace, heapAllocPair.first.traceSize, fileno(stdout));
+            char **temp = backtrace_symbols((void **)pair.second->regionTrace, REGION_BACKTRACE_DEPTH);
+            for (int i = 0; i < REGION_BACKTRACE_DEPTH; i++)
+               {
+               put_offset(out_file, temp[i]);
+               }
+            fprintf(out_file, "\n");
+
+            // fflush(stdout);
+            // printf("==== Allocations ====\n");
+            for (auto &allocPair : *(pair.second->allocMap))
+               {
+               
+               // fflush(stdout);
+               fprintf(out_file, "%ld ", allocPair.second);
+               temp = backtrace_symbols((void **)allocPair.first.trace, MAX_BACKTRACE_SIZE);
+               for (int i = 0; i < MAX_BACKTRACE_SIZE; i++)
+                  {
+                  put_offset(out_file, temp[i]);
+                  }
+               fprintf(out_file, "\n");
                // fflush(stdout);
                }
-            printf("=== End ===\n");
+            // printf("=== End ===\n");
             // fflush(stdout);
             }
-         else if (OMR::Options::_printBackTrace == 2)
-            {
-               for (auto &heapAllocPair : *(pair.second->allocMap))
-               {
-               // printf("Heap Allocated [%lu] bytes\n", heapAllocPair.second);
-               // fflush(stdout);
-               char **temp = backtrace_symbols((void **)heapAllocPair.first.trace, heapAllocPair.first.traceSize);
-               // fflush(stdout);
-               }
-            }
+         // else if (OMR::Options::_printBackTrace == 2)
+         //    {
+         //       for (auto &heapAllocPair : *(pair.second->allocMap))
+         //       {
+         //       // printf("Heap Allocated [%lu] bytes\n", heapAllocPair.second);
+         //       // fflush(stdout);
+         //       char **temp = backtrace_symbols((void **)heapAllocPair.first.trace, heapAllocPair.first.traceSize);
+         //       // fflush(stdout);
+         //       }
+         //    }
          }
+      fclose(out_file);
       }
    }
 }

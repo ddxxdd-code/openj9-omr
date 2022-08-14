@@ -1794,8 +1794,9 @@ public:
    // 0: no collection, 1: collect back trace with no insertion, 2: collect stack only, 3: colledct heap only, 4: collect all
    static uint32_t _collectBackTrace;
    // Control if backtrace to be printed
-   // 0: do nothing, 1: loop but no call in loop, 2: loop with symbols no output to fd, 3: print
+   // 0: do nothing, 1: loop but no call in loop, 2: print
    static uint32_t _printBackTrace;
+   static intptr_t   _backTraceFileName;
 
    // Debug counter insertion options
    static TR::SimpleRegex *_debugCounterInsertByteCode;
@@ -1858,6 +1859,9 @@ public:
    void disableCHOpts(); // disable CHOpts, but also IPA and prex which depend on the chtable
 
    const char *getObjectFileName() { return _objectFileName; }
+
+   // static const char *getBackTraceDumpFileName() { return _backTraceFileName; }
+   // static void setBackTraceDumpFileName(char *name) { _backTraceFileName = name; }
 
 protected:
    void  jitPreProcess();
@@ -2334,6 +2338,8 @@ protected:
    int32_t                     _loopyAsyncCheckInsertionMaxEntryFreq;
 
    char *                      _objectFileName; //Name of the relocatable ELF file *.o if one is to be generated
+
+   // static char *               _backTraceFileName; // Output file for backtrace
 
    }; // TR::Options
 

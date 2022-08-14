@@ -35,6 +35,8 @@
 #include <unordered_map>
 
 #define MAX_BACKTRACE_SIZE 10
+#define REGION_BACKTRACE_DEPTH 3
+#define TARGET_EXECUTABLE_FILE "libj9jit29.so"
 
 template<typename K, typename V>
 using PersistentUnorderedMapAllocator = TR::typed_allocator<std::pair<const K, V>, TR::PersistentAllocator &>;
@@ -48,10 +50,10 @@ struct allocEntry
 
    bool operator==(const allocEntry &other) const 
       {
-         if(traceSize != other.traceSize)
-            {
-            return false;
-            }
+         // if(traceSize != other.traceSize)
+         //    {
+         //    return false;
+         //    }
          return memcmp(trace, other.trace, sizeof(void *)*traceSize) == 0;
       }
    };
@@ -63,8 +65,9 @@ namespace std {
    std::size_t operator()(const allocEntry& k) const
       {
       using std::hash;
-      size_t result = hash<int>()(k.traceSize);
-      for (int i = 0; i < k.traceSize; i++) 
+      // size_t result = hash<int>()(k.traceSize);
+      size_t result = 0;
+      for (int i = 0; i < MAX_BACKTRACE_SIZE; i++) 
          {
          result ^= hash<void *>()(k.trace[i]);
          }
@@ -77,8 +80,8 @@ class regionLog
    {
    public:
       bool is_heap;
-      int regionTraceSize;
-      void *regionTrace[MAX_BACKTRACE_SIZE];
+      // int regionTraceSize;
+      void *regionTrace[REGION_BACKTRACE_DEPTH];
       char *compInfo;
 
       PersistentUnorderedMap<allocEntry, size_t> *allocMap;

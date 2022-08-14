@@ -1288,9 +1288,10 @@ TR::OptionTable OMR::Options::_jitOptions[] = {
    {"waitOnCompilationQueue",        "M\tPerform synchronous wait until compilation queue empty. Primarily for use with Compiler.command", SET_OPTION_BIT(TR_WaitBit), "F", NOT_IN_SUBSET},
    {"x86HLE",         "C\tEnable haswell hardware lock elision", SET_OPTION_BIT(TR_X86HLE), "F"},
    {"x86UseMFENCE",   "M\tEnable to use mfence to handle volatile store", SET_OPTION_BIT(TR_X86UseMFENCE), "F", NOT_IN_SUBSET},
+   {"zBackTraceFile=", "P<filename>\tPath to file to dump backtrace", TR::Options::setStaticString,  (intptr_t)(&OMR::Options::_backTraceFileName), 0, "P%s"},
    {"zCollectBackTrace=", "D<nnn>\tNumber 0or1or2or3or4",
         TR::Options::setStaticNumeric, (intptr_t)&OMR::Options::_collectBackTrace, 0, "F%d", NOT_IN_SUBSET},
-   {"zPrintBackTrace=", "D<nnn>\tNumber 0or1or2or3",
+   {"zPrintBackTrace=", "D<nnn>\tNumber 0or1or2",
         TR::Options::setStaticNumeric, (intptr_t)&OMR::Options::_printBackTrace, 0, "F%d", NOT_IN_SUBSET},
    {NULL}
 };
@@ -1728,6 +1729,8 @@ int32_t       OMR::Options::_stopThrottlingTime = 0; // ms. 0 means no expiratio
 // option for backtrace
 uint32_t      OMR::Options::_collectBackTrace = 0;
 uint32_t      OMR::Options::_printBackTrace = 0;
+// setBackTraceDumpFileName("backtrace.log");
+intptr_t  OMR::Options::_backTraceFileName = (intptr_t)"backtrace.log";
 //
 // -----------------------------------------------------------------------------
 
@@ -3623,6 +3626,11 @@ OMR::Options::jitPostProcess()
    {
    _enableDLTBytecodeIndex = -1;
    _disableDLTBytecodeIndex = -1;
+
+   // if (!_backTraceFileName)
+   //    {
+   //    setBackTraceDumpFileName("backtrace.log");
+   //    }
 
    if (_logFileName)
       {
