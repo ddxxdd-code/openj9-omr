@@ -128,7 +128,7 @@ Region::~Region() throw()
 void *
 Region::allocate(size_t const size, void *hint)
    {
-   if (OMR::Options::_collectBackTrace >= 1)
+   if (OMR::Options::_collectBackTrace >= 1 && size > 0)
       {
       // Add compilation information to regionAllocMap
       if (regionAllocMap->compInfo == NULL)

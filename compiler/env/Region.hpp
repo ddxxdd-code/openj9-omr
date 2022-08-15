@@ -50,7 +50,6 @@ using PersistentVector = std::vector<K, PersistentVectorAllocator<K>>;
 
 struct allocEntry
    {
-   // int traceSize;
    void *trace[MAX_BACKTRACE_SIZE];
 
    bool operator==(const allocEntry &other) const 
@@ -65,8 +64,6 @@ namespace std {
    {
    std::size_t operator()(const allocEntry& k) const
       {
-      using std::hash;
-      // size_t result = hash<int>()(k.traceSize);
       size_t result = 0;
       for (int i = 0; i < MAX_BACKTRACE_SIZE; i++) 
          {
@@ -81,7 +78,6 @@ class regionLog
    {
    public:
       bool _isHeap;
-      // int regionTraceSize;
       void *regionTrace[REGION_BACKTRACE_DEPTH];
       char *compInfo;
 
@@ -92,18 +88,6 @@ class regionLog
             return memcmp(regionTrace, other.regionTrace, sizeof(void *)*REGION_BACKTRACE_DEPTH) == 0;
          }
       };
-
-// namespace std {
-//    template<>
-//    struct hash<regionLog>
-//    {
-//    std::size_t operator()(const regionLog& k) const
-//       {
-//       using std::hash;
-//       return hash<const void *>()(&k);
-//       }
-//    };
-// }
 
 namespace TR {
 
