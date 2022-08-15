@@ -80,16 +80,16 @@ namespace std {
 class regionLog
    {
    public:
-      bool is_heap;
+      bool _isHeap;
       // int regionTraceSize;
       void *regionTrace[REGION_BACKTRACE_DEPTH];
       char *compInfo;
 
-      PersistentUnorderedMap<allocEntry, size_t> *allocMap;
+      PersistentUnorderedMap<allocEntry, size_t> *allocMap; // TODO: change this to actual thing instead of pointer
       regionLog(TR::PersistentAllocator *allocator);
       bool operator==(const regionLog &other) const 
          {
-            return allocMap == other.allocMap;
+            return memcmp(regionTrace, other.regionTrace, sizeof(void *)*REGION_BACKTRACE_DEPTH) == 0;
          }
       };
 
@@ -158,21 +158,18 @@ class Region
       };
 
 public:
-   Region(TR::SegmentProvider &segmentProvider, TR::RawAllocator rawAllocator);
-   Region(const Region &prototype);
+   Region(TR::SegmentProvider &segmentProvider, TR::RawAllocator rawAllocator, bool isHeap = true);
+   Region(const Region &prototype, bool isHeap = true);
    virtual ~Region() throw();
    void * allocate(const size_t bytes, void * hint = 0);
 
-   static void init_alloc_map_list(TR::PersistentAllocator *allocator);
-   // static void init_heap_alloc_map();
-   static void print_alloc_entry();
+   static void initAllocMapList(TR::PersistentAllocator *allocator);
+   static void printRegionAllocations();
 
    // Signifier for the type of memory
-   bool is_heap = true;
-   // UnorderedMap to collect allocation heaps in this region
+   // bool is_heap = true;
+   // RegionLog to collect all allocations inside this Region instance
    struct regionLog *regionAllocMap;
-   // PersistentUnorderedMap<allocEntry, size_t> *heapAllocMap;
-   // PersistentUnorderedMap<allocEntry, size_t> *heapAllocMap;
 
    /**
     * @brief A function template to create a Region-managed object instance.
