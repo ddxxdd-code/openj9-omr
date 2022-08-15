@@ -79,7 +79,7 @@ class regionLog
    public:
       bool _isHeap;
       void *regionTrace[REGION_BACKTRACE_DEPTH];
-      char *compInfo;
+      char *methodCompiled;
 
       PersistentUnorderedMap<allocEntry, size_t> *allocMap; // TODO: change this to actual thing instead of pointer
       regionLog(TR::PersistentAllocator *allocator);

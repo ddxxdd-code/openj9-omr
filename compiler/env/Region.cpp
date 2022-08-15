@@ -43,7 +43,7 @@
 regionLog::regionLog(TR::PersistentAllocator *allocator)
    {
    // in heap region, is_heap will be kept true while stack region will rewrite this to false on creation
-   compInfo = NULL;
+   methodCompiled = NULL;
    allocMap = new (PERSISTENT_NEW) PersistentUnorderedMap<allocEntry, size_t>(PersistentUnorderedMap<allocEntry, size_t>::allocator_type(*allocator));
    }
 
@@ -131,13 +131,13 @@ Region::allocate(size_t const size, void *hint)
    if (OMR::Options::_collectBackTrace >= 1 && size > 0)
       {
       // Add compilation information to regionAllocMap
-      if (regionAllocMap->compInfo == NULL)
+      if (regionAllocMap->methodCompiled == NULL)
          {
          if (TR::comp())
             {
             size_t length = strlen(TR::comp()->signature()) + 1;
-            regionAllocMap->compInfo = (char *) _persistentAllocator->allocate(length);
-            memcpy(regionAllocMap->compInfo, TR::comp()->signature(), length);
+            regionAllocMap->methodCompiled = (char *) _persistentAllocator->allocate(length);
+            memcpy(regionAllocMap->methodCompiled, TR::comp()->signature(), length);
             }
          }
       // Backtrace allocation
@@ -229,9 +229,9 @@ Region::printRegionAllocations()
                {
                continue;
                }
-            if (region->compInfo)
+            if (region->methodCompiled)
                {
-               fprintf(out_file, "%s\n", region->compInfo);
+               fprintf(out_file, "%s\n", region->methodCompiled);
                }
             else
                {
