@@ -42,7 +42,6 @@
 // Constructor for regionLog to keep the log of each region object
 regionLog::regionLog(TR::PersistentAllocator *allocator)
    {
-   // in heap region, is_heap will be kept true while stack region will rewrite this to false on creation
    methodCompiled = NULL;
    allocMap = new (PERSISTENT_NEW) PersistentUnorderedMap<allocEntry, size_t>(PersistentUnorderedMap<allocEntry, size_t>::allocator_type(*allocator));
    }
@@ -196,15 +195,16 @@ Region::initAllocMapList(TR::PersistentAllocator *allocator)
    }
 
 static void
-put_offset(std::FILE *file, char *line)
+putOffset(std::FILE *file, char *line)
    {
-   if (strstr(line, TARGET_EXECUTABLE_FILE) != NULL)
+   if (char *targetExecFileStart = strstr(line, TARGET_EXECUTABLE_FILE))
       {
       // Warning: here we make the assumption that the line is of the format <executable_file>(+0x<offset>)
       // without checking the format, doing below lines is risky
       // We make such assumption to reduce the cost of checking each time for a faster output.
-      *strchr(line, ')') = '\0';
-      fprintf(file, "%s ", strchr(line, '(') + 4);
+      char *offsetStart = strchr(targetExecFileStart, '(') + 4;   // Add 4 here is to skip prefix '(+0x'
+      *strchr(offsetStart, ')') = '\0';
+      fprintf(file, "%s ", offsetStart);
       }
    }
 
@@ -220,7 +220,6 @@ Region::printRegionAllocations()
          // Here we assume backTraceFile is initialized.
          if (OMR::Options::_printBackTrace == 2)  
             {
-            // fflush(stdout);
             // Output to selected file in the format:
             // Compiled method's info
             // Region backtrace (3 lines)
@@ -250,7 +249,7 @@ Region::printRegionAllocations()
             char **temp = backtrace_symbols((void **)region->regionTrace, REGION_BACKTRACE_DEPTH);
             for (int i = 0; i < REGION_BACKTRACE_DEPTH; i++)
                {
-               put_offset(out_file, temp[i]);
+               putOffset(out_file, temp[i]);
                }
             fprintf(out_file, "\n");
             for (auto &allocPair : *(region->allocMap))
@@ -259,7 +258,7 @@ Region::printRegionAllocations()
                temp = backtrace_symbols((void **)allocPair.first.trace, MAX_BACKTRACE_SIZE);
                for (int i = 0; i < MAX_BACKTRACE_SIZE; i++)
                   {
-                  put_offset(out_file, temp[i]);
+                  putOffset(out_file, temp[i]);
                   }
                fprintf(out_file, "\n");
                }
