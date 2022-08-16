@@ -137,6 +137,7 @@ Region::allocate(size_t const size, void *hint)
             size_t length = strlen(TR::comp()->signature()) + 1;
             regionAllocMap->methodCompiled = (char *) _persistentAllocator->allocate(length);
             memcpy(regionAllocMap->methodCompiled, TR::comp()->signature(), length);
+            *regionAllocMap->methodCompiled[length-1] = '\0';
             }
          }
       // Backtrace allocation
