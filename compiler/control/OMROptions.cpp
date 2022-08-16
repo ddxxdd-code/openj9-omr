@@ -1730,7 +1730,7 @@ int32_t       OMR::Options::_stopThrottlingTime = 0; // ms. 0 means no expiratio
 uint32_t      OMR::Options::_collectBackTrace = 0;
 uint32_t      OMR::Options::_printBackTrace = 0;
 // setBackTraceDumpFileName("backtrace.log");
-intptr_t  OMR::Options::_backTraceFileName = (intptr_t)"backtrace.log";
+char * OMR::Options::_backTraceFileName = "backtrace.log";
 //
 // -----------------------------------------------------------------------------
 

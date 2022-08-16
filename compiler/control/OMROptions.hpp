@@ -1796,7 +1796,7 @@ public:
    // Control if backtrace to be printed
    // 0: do nothing, 1: loop but no call in loop, 2: print
    static uint32_t _printBackTrace;
-   static intptr_t   _backTraceFileName;
+   static char *   _backTraceFileName;
 
    // Debug counter insertion options
    static TR::SimpleRegex *_debugCounterInsertByteCode;
