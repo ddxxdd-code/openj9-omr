@@ -256,7 +256,9 @@ Region::printRegionAllocations()
             for (int i = 0; i < REGION_BACKTRACE_DEPTH; i++)
                {
                putOffset(out_file, temp[i]);
+               std::free(temp[i])
                }
+            std::free(temp)
             fprintf(out_file, "\n");
             for (auto &allocPair : *(region->allocMap))
                {
@@ -265,7 +267,9 @@ Region::printRegionAllocations()
                for (int i = 0; i < MAX_BACKTRACE_SIZE; i++)
                   {
                   putOffset(out_file, temp[i]);
+                  std::free(temp[i])
                   }
+               std::free(temp)
                fprintf(out_file, "\n");
                }
             }
