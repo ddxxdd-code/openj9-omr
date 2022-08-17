@@ -216,6 +216,11 @@ Region::printRegionAllocations()
       {
       TR_ASSERT_FATAL(heapAllocMapList, "heapAllocMapList is not initialized");
       std::FILE *out_file = fopen(OMR::Options::_backTraceFileName,"w");
+      if (!out_file)
+         {
+         perror("open output file");
+         }
+      TR_ASSERT_FATAL(out_file, "output file not opened successfully");
       for (auto &region : *heapAllocMapList) 
          {
          // Here we assume backTraceFile is initialized.
