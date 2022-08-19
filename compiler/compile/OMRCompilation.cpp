@@ -108,6 +108,7 @@
 #include "ilgen/IlGen.hpp"
 #include "env/RegionProfiler.hpp"
 #include "omrformatconsts.h"
+#include "AtomicSupport.hpp"
 
 // this ratio defines how full the alias memory region is allowed to become before
 // it is recreated after an optimization finishes
@@ -456,6 +457,9 @@ OMR::Compilation::Compilation(
       }
    else
       _osrCompilationData = NULL;
+
+   // Assign sequence number for this compilation
+   _sequenceNumber = VM_AtomicSupport::addU32(&compilationSequenceNumber, 1) - 1;
    }
 
 OMR::Compilation::~Compilation() throw()
@@ -2585,6 +2589,12 @@ struct DebugValue
    };
 
 static DebugValue *head = 0;
+
+namespace OMR
+   {
+   // Global counter for serial number for compilations
+   static uint32_t compilationSequenceNumber = 0;
+   }
 
 void addDebug(const char * debugString)
    {

@@ -132,11 +132,11 @@ Region::allocate(size_t const size, void *hint)
       // Add compilation information to regionAllocMap
       if (regionAllocMap->methodCompiled == NULL)
          {
-         if (TR::comp())
+         if (_compilation = TR::comp())
             {
-            size_t length = strlen(TR::comp()->signature()) + 1;
+            size_t length = strlen(_compilation->signature()) + 1;
             regionAllocMap->methodCompiled = (char *) _persistentAllocator->allocate(length);
-            memcpy(regionAllocMap->methodCompiled, TR::comp()->signature(), length);
+            memcpy(regionAllocMap->methodCompiled, _compilation->signature(), length);
             regionAllocMap->methodCompiled[length-1] = '\0';
             }
          }

@@ -482,6 +482,9 @@ public:
 
    TR::HCRMode getHCRMode();
 
+   // compilation sequernce number
+   int32_t getSequenceNumber() { return _sequenceNumber; }
+
    // ==========================================================================
    // Symbol reference
    //
@@ -1314,6 +1317,10 @@ private:
    int64_t                           _cpuTimeAtStartOfCompilation;
 
    TR::IlVerifier                    *_ilVerifier;
+
+   // The sequence number as universial identifier of each compilation
+   uint32_t                          _sequenceNumber;
+   static uint32_t                   compilationSequenceNumber;
 
    ListHeadAndTail<char*> _gpuPtxList;
    ListHeadAndTail<int32_t> _gpuKernelLineNumberList; //TODO: fix to get real line numbers

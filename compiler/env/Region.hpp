@@ -154,6 +154,8 @@ public:
    // bool is_heap = true;
    // RegionLog to collect all allocations inside this Region instance
    struct regionLog *regionAllocMap;
+   // TR::Comp() local copy
+   class OMR_EXTENSIBLE Compilation *_compilation;
 
    /**
     * @brief A function template to create a Region-managed object instance.
