@@ -40,15 +40,16 @@
 // _printBackTrace:     0: nothing at the end, 1: no print but loop at the end, 2: print
 
 // Constructor for regionLog to keep the log of each region object
-regionLog::regionLog(TR::PersistentAllocator *allocator)
+RegionLog::RegionLog(TR::PersistentAllocator *allocator)
    {
-   methodCompiled = NULL;
-   allocMap = new (PERSISTENT_NEW) PersistentUnorderedMap<allocEntry, size_t>(PersistentUnorderedMap<allocEntry, size_t>::allocator_type(*allocator));
+   _methodCompiled = NULL;
+   _allocMap = new (PERSISTENT_NEW) PersistentUnorderedMap<AllocEntry, size_t>(PersistentUnorderedMap<AllocEntry, size_t>::allocator_type(*allocator));
    }
 
 namespace TR {
 
-static PersistentVector<regionLog *> *heapAllocMapList = NULL;
+// TODO: find where these should be at
+static PersistentVector<RegionLog *> *heapAllocMapList = NULL;
 static Monitor *heapAllocMapListMonitor;
 static PersistentAllocator *_persistentAllocator = NULL;
 
@@ -62,12 +63,12 @@ Region::Region(TR::SegmentProvider &segmentProvider, TR::RawAllocator rawAllocat
    {
    if (OMR::Options::_collectBackTrace >= 1)
       {
-      regionAllocMap = new (PERSISTENT_NEW) regionLog(_persistentAllocator);
-      regionAllocMap->_isHeap = isHeap;
+      _regionAllocMap = new (PERSISTENT_NEW) RegionLog(_persistentAllocator);
+      _regionAllocMap->_isHeap = isHeap;
       // collect backtrace of the constructor of the region
       void *trace[REGION_BACKTRACE_DEPTH + 1];
       unw_backtrace(trace, REGION_BACKTRACE_DEPTH + 1);
-      memcpy(regionAllocMap->regionTrace, &trace[1], REGION_BACKTRACE_DEPTH * sizeof(void *));
+      memcpy(_regionAllocMap->_regionTrace, &trace[1], REGION_BACKTRACE_DEPTH * sizeof(void *));
       }
    }
 
@@ -81,12 +82,12 @@ Region::Region(const Region &prototype, bool isHeap) :
    {
    if (OMR::Options::_collectBackTrace >= 1)
       {
-      regionAllocMap = new (PERSISTENT_NEW) regionLog(_persistentAllocator);
-      regionAllocMap->_isHeap = isHeap;
+      _regionAllocMap = new (PERSISTENT_NEW) RegionLog(_persistentAllocator);
+      _regionAllocMap->_isHeap = isHeap;
       // collect backtrace of the constructor of the region
       void *trace[REGION_BACKTRACE_DEPTH + 1];
       unw_backtrace(trace, REGION_BACKTRACE_DEPTH + 1);
-      memcpy(regionAllocMap->regionTrace, &trace[1], REGION_BACKTRACE_DEPTH * sizeof(void *));
+      memcpy(_regionAllocMap->_regionTrace, &trace[1], REGION_BACKTRACE_DEPTH * sizeof(void *));
       }
    }
 
@@ -97,8 +98,8 @@ Region::~Region() throw()
          // add heapAllocMap to heapAllocMapList
          TR_ASSERT(heapAllocMapList && heapAllocMapListMonitor, "heapAllocMapList unintialized");
          OMR::CriticalSection listInsertCS(heapAllocMapListMonitor);
-         heapAllocMapList->push_back(regionAllocMap);
-         regionAllocMap = NULL;
+         heapAllocMapList->push_back(_regionAllocMap);
+         _regionAllocMap = NULL;
          }
    /*
     * Destroy all object instances that depend on the region
@@ -130,32 +131,34 @@ Region::allocate(size_t const size, void *hint)
    if (OMR::Options::_collectBackTrace >= 1 && size > 0)
       {
       // Add compilation information to regionAllocMap
-      if (regionAllocMap->methodCompiled == NULL)
+      if (_regionAllocMap->_methodCompiled == NULL)
          {
          if (_compilation = TR::comp())
             {
+            _regionAllocMap->_sequenceNumber = _compilation->getSequenceNumber();
+            _regionAllocMap->_optLevel = _compilation->getOptLevel();
             size_t length = strlen(_compilation->signature()) + 1;
-            regionAllocMap->methodCompiled = (char *) _persistentAllocator->allocate(length);
-            memcpy(regionAllocMap->methodCompiled, _compilation->signature(), length);
-            regionAllocMap->methodCompiled[length-1] = '\0';
+            _regionAllocMap->_methodCompiled = (char *) _persistentAllocator->allocate(length);
+            memcpy(_regionAllocMap->_methodCompiled, _compilation->signature(), length);
+            _regionAllocMap->_methodCompiled[length-1] = '\0';
             }
          }
       // Backtrace allocation
-      if (OMR::Options::_collectBackTrace >= 4 || (OMR::Options::_collectBackTrace == 2 && !regionAllocMap->_isHeap) || (OMR::Options::_collectBackTrace == 3 && regionAllocMap->_isHeap))
+      if (OMR::Options::_collectBackTrace >= 4 || (OMR::Options::_collectBackTrace == 2 && !_regionAllocMap->_isHeap) || (OMR::Options::_collectBackTrace == 3 && _regionAllocMap->_isHeap))
          {
-         struct allocEntry entry;
+         struct AllocEntry entry;
          void *trace[MAX_BACKTRACE_SIZE + 1];
          unw_backtrace(trace, MAX_BACKTRACE_SIZE + 1);
-         memcpy(entry.trace, &trace[1], MAX_BACKTRACE_SIZE * sizeof(void *));
-         TR_ASSERT(regionAllocMap, "regionAllocMap is not built");
-         auto match = regionAllocMap->allocMap->find(entry);
-         if (match != regionAllocMap->allocMap->end())
+         memcpy(entry._trace, &trace[1], MAX_BACKTRACE_SIZE * sizeof(void *));
+         TR_ASSERT(_regionAllocMap, "regionAllocMap is not built");
+         auto match = _regionAllocMap->_allocMap->find(entry);
+         if (match != _regionAllocMap->_allocMap->end())
             {
             match->second += size;
             }
          else
             {
-            regionAllocMap->allocMap->insert({entry, size});
+            _regionAllocMap->_allocMap->insert({entry, size});
             }
          }
       }
@@ -190,7 +193,7 @@ Region::initAllocMapList(TR::PersistentAllocator *allocator)
       if (OMR::Options::_collectBackTrace >= 1)
       {
       _persistentAllocator = allocator;
-      heapAllocMapList = new (PERSISTENT_NEW) PersistentVector<regionLog *>(PersistentVector<regionLog *>::allocator_type(*allocator));
+      heapAllocMapList = new (PERSISTENT_NEW) PersistentVector<RegionLog *>(PersistentVector<RegionLog *>::allocator_type(*allocator));
       heapAllocMapListMonitor = Monitor::create("JITCompilerHeapAllocMapListMonitor");
       }
    }
@@ -234,9 +237,9 @@ Region::printRegionAllocations()
                {
                continue;
                }
-            if (region->methodCompiled)
+            if (region->_methodCompiled)
                {
-               fprintf(out_file, "%s\n", region->methodCompiled);
+               fprintf(out_file, "%s %d %d\n", region->_methodCompiled, region->_sequenceNumber, region->_optLevel); // TODO: change printf to signify that _sequenceNumber is uint32_t and optLevel is int32_t
                }
             else
                {
@@ -252,17 +255,17 @@ Region::printRegionAllocations()
                {
                fprintf(out_file, "0 ");
                }
-            char **temp = backtrace_symbols((void **)region->regionTrace, REGION_BACKTRACE_DEPTH);
+            char **temp = backtrace_symbols((void **)region->_regionTrace, REGION_BACKTRACE_DEPTH);
             for (int i = 0; i < REGION_BACKTRACE_DEPTH; i++)
                {
                putOffset(out_file, temp[i]);
                }
             free(temp);
             fprintf(out_file, "\n");
-            for (auto &allocPair : *(region->allocMap))
+            for (auto &allocPair : *(region->_allocMap))
                {
                fprintf(out_file, "%zu ", allocPair.second);
-               temp = backtrace_symbols((void **)allocPair.first.trace, MAX_BACKTRACE_SIZE);
+               temp = backtrace_symbols((void **)allocPair.first._trace, MAX_BACKTRACE_SIZE);
                for (int i = 0; i < MAX_BACKTRACE_SIZE; i++)
                   {
                   putOffset(out_file, temp[i]);

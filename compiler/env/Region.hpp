@@ -48,44 +48,46 @@ using PersistentVectorAllocator = TR::typed_allocator<K, TR::PersistentAllocator
 template<typename K>
 using PersistentVector = std::vector<K, PersistentVectorAllocator<K>>;
 
-struct allocEntry
+struct AllocEntry
    {
-   void *trace[MAX_BACKTRACE_SIZE];
+   void *_trace[MAX_BACKTRACE_SIZE];
 
-   bool operator==(const allocEntry &other) const 
+   bool operator==(const AllocEntry &other) const 
       {
-         return memcmp(trace, other.trace, sizeof(void *)*MAX_BACKTRACE_SIZE) == 0;
+         return memcmp(_trace, other._trace, sizeof(void *)*MAX_BACKTRACE_SIZE) == 0;
       }
    };
 
 namespace std {
   template <>
-  struct hash<allocEntry>
+  struct hash<AllocEntry>
    {
-   std::size_t operator()(const allocEntry& k) const
+   std::size_t operator()(const AllocEntry& k) const
       {
       size_t result = 0;
       for (int i = 0; i < MAX_BACKTRACE_SIZE; i++) 
          {
-         result ^= hash<void *>()(k.trace[i]);
+         result ^= hash<void *>()(k._trace[i]);
          }
       return result;
       }
    };
 }
 
-class regionLog
+class RegionLog
    {
    public:
       bool _isHeap;
-      void *regionTrace[REGION_BACKTRACE_DEPTH];
-      char *methodCompiled;
+      uint32_t _sequenceNumber;
+      int32_t _optLevel;
+      char *_methodCompiled;
+      void *_regionTrace[REGION_BACKTRACE_DEPTH];
 
-      PersistentUnorderedMap<allocEntry, size_t> *allocMap; // TODO: change this to actual thing instead of pointer
-      regionLog(TR::PersistentAllocator *allocator);
-      bool operator==(const regionLog &other) const 
+      PersistentUnorderedMap<AllocEntry, size_t> *_allocMap; // TODO: change this to actual thing instead of pointer
+      RegionLog(TR::PersistentAllocator *allocator);
+      bool operator==(const RegionLog &other) const 
          {
-            return memcmp(regionTrace, other.regionTrace, sizeof(void *)*REGION_BACKTRACE_DEPTH) == 0;
+            return memcmp(_regionTrace, other._regionTrace, sizeof(void *)*REGION_BACKTRACE_DEPTH) == 0;
          }
       };
 
@@ -153,7 +155,7 @@ public:
    // Signifier for the type of memory
    // bool is_heap = true;
    // RegionLog to collect all allocations inside this Region instance
-   struct regionLog *regionAllocMap;
+   struct RegionLog *_regionAllocMap;
    // TR::Comp() local copy
    class OMR_EXTENSIBLE Compilation *_compilation;
 
