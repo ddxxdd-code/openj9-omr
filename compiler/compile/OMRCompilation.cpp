@@ -191,6 +191,8 @@ OMR::Compilation::getHotnessName(TR_Hotness h)
    return pHotnessNames[h];
    }
 
+// Initilize static member of OMR::Compilation for tracking sequence number
+uint32_t OMR::Compilation::compilationSequenceNumber = 0;
 
 OMR::Compilation::Compilation(
       int32_t id,
@@ -459,7 +461,7 @@ OMR::Compilation::Compilation(
       _osrCompilationData = NULL;
 
    // Assign sequence number for this compilation
-   _sequenceNumber = VM_AtomicSupport::addU32(&compilationSequenceNumber, 1) - 1;
+   _sequenceNumber = VM_AtomicSupport::addU32(&OMR::Compilation::compilationSequenceNumber, 1) - 1;
    }
 
 OMR::Compilation::~Compilation() throw()
@@ -2589,12 +2591,6 @@ struct DebugValue
    };
 
 static DebugValue *head = 0;
-
-namespace OMR
-   {
-   // Global counter for serial number for compilations
-   static uint32_t compilationSequenceNumber = 0;
-   }
 
 void addDebug(const char * debugString)
    {
