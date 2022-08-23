@@ -79,9 +79,12 @@ class RegionLog
    public:
       bool _isHeap;
       uint32_t _sequenceNumber;
-      int32_t _optLevel;
       char *_methodCompiled;
       void *_regionTrace[REGION_BACKTRACE_DEPTH];
+      // Logical timestamp for start of the region
+      int32_t _startTime;
+      int32_t _endTime;
+      size_t _bytesAllocated;
 
       PersistentUnorderedMap<AllocEntry, size_t> *_allocMap; // TODO: change this to actual thing instead of pointer
       RegionLog(TR::PersistentAllocator *allocator);
@@ -152,8 +155,6 @@ public:
    static void initAllocMapList(TR::PersistentAllocator *allocator);
    static void printRegionAllocations();
 
-   // Signifier for the type of memory
-   // bool is_heap = true;
    // RegionLog to collect all allocations inside this Region instance
    struct RegionLog *_regionAllocMap;
    // TR::Comp() local copy

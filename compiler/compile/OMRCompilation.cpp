@@ -462,6 +462,9 @@ OMR::Compilation::Compilation(
 
    // Assign sequence number for this compilation
    _sequenceNumber = VM_AtomicSupport::addU32(&OMR::Compilation::compilationSequenceNumber, 1) - 1;
+
+   // Initialize the compilation timestamp to 0 on creation
+   _timestampCounter = 0;
    }
 
 OMR::Compilation::~Compilation() throw()

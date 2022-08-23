@@ -69,6 +69,14 @@ Region::Region(TR::SegmentProvider &segmentProvider, TR::RawAllocator rawAllocat
       void *trace[REGION_BACKTRACE_DEPTH + 1];
       unw_backtrace(trace, REGION_BACKTRACE_DEPTH + 1);
       memcpy(_regionAllocMap->_regionTrace, &trace[1], REGION_BACKTRACE_DEPTH * sizeof(void *));
+      if (_compilation = TR::comp())
+         {
+         _regionAllocMap->_startTime = _compilation->recordEvent();
+         }
+      else
+         {
+         _regionAllocMap->_startTime = 0;
+         }
       }
    }
 
@@ -88,6 +96,14 @@ Region::Region(const Region &prototype, bool isHeap) :
       void *trace[REGION_BACKTRACE_DEPTH + 1];
       unw_backtrace(trace, REGION_BACKTRACE_DEPTH + 1);
       memcpy(_regionAllocMap->_regionTrace, &trace[1], REGION_BACKTRACE_DEPTH * sizeof(void *));
+      if (_compilation = TR::comp())
+         {
+         _regionAllocMap->_startTime = _compilation->recordEvent();
+         }
+      else
+         {
+         _regionAllocMap->_startTime = 0;
+         }
       }
    }
 
@@ -95,6 +111,16 @@ Region::~Region() throw()
    {
       if (OMR::Options::_collectBackTrace >= 2)
          {
+         try 
+            {
+            _regionAllocMap->_endTime = _compilation->recordEvent();
+            }
+         catch (...)
+            {
+            _regionAllocMap->_endTime = -1;
+            }
+         // Get total bytes allocated
+         _regionAllocMap->_bytesAllocated = bytesAllocated();
          // add heapAllocMap to heapAllocMapList
          TR_ASSERT(heapAllocMapList && heapAllocMapListMonitor, "heapAllocMapList unintialized");
          OMR::CriticalSection listInsertCS(heapAllocMapListMonitor);
@@ -133,10 +159,9 @@ Region::allocate(size_t const size, void *hint)
       // Add compilation information to regionAllocMap
       if (_regionAllocMap->_methodCompiled == NULL)
          {
-         if (_compilation = TR::comp())
+         if (_compilation || (_compilation = TR::comp()))
             {
             _regionAllocMap->_sequenceNumber = _compilation->getSequenceNumber();
-            _regionAllocMap->_optLevel = _compilation->getOptLevel();
             size_t length = strlen(_compilation->signature()) + 1;
             _regionAllocMap->_methodCompiled = (char *) _persistentAllocator->allocate(length);
             memcpy(_regionAllocMap->_methodCompiled, _compilation->signature(), length);
@@ -239,7 +264,7 @@ Region::printRegionAllocations()
                }
             if (region->_methodCompiled)
                {
-               fprintf(out_file, "%s %d %d\n", region->_methodCompiled, region->_sequenceNumber, region->_optLevel); // TODO: change printf to signify that _sequenceNumber is uint32_t and optLevel is int32_t
+               fprintf(out_file, "%s %d %d %d %zu\n", region->_methodCompiled, region->_sequenceNumber, region->_startTime, region->_endTime, region->_bytesAllocated); // TODO: change printf to signify that _sequenceNumber is uint32_t and optLevel is int32_t
                }
             else
                {
