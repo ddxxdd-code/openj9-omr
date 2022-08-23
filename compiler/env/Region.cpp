@@ -111,13 +111,13 @@ Region::~Region() throw()
    {
       if (OMR::Options::_collectBackTrace >= 2)
          {
-         try 
-            {
-            _regionAllocMap->_endTime = _compilation->recordEvent();
-            }
-         catch (...)
+         if (!_compilation)
             {
             _regionAllocMap->_endTime = -1;
+            }
+         else
+            {
+            _regionAllocMap->_endTime = _compilation->recordEvent();
             }
          // Get total bytes allocated
          _regionAllocMap->_bytesAllocated = bytesAllocated();

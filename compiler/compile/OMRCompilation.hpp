@@ -486,7 +486,7 @@ public:
    int32_t getSequenceNumber() { return _sequenceNumber; }
 
    // increase the timestamp counter and return the timestamp
-   int32_t recordEvent() { return ++_timestampCounter; }
+   int32_t recordEvent() {return ++_timestampCounter; }
 
    // ==========================================================================
    // Symbol reference
