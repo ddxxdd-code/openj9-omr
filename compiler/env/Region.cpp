@@ -76,7 +76,7 @@ Region::Region(TR::SegmentProvider &segmentProvider, TR::RawAllocator rawAllocat
          if (_compilation->getOptLevel() >= OMR::Options::_minOptLevelCollected)
             {
             _collectStackTrace = true;
-            _regionAllocMap = new (PERSISTENT_NEW) RegionLog();
+            _regionAllocMap = new (PERSISTENT_NEW) RegionLog;
             _regionAllocMap->_isHeap = isHeap;
             // collect backtrace of the constructor of the region
             void *trace[REGION_BACKTRACE_DEPTH + 1];
@@ -89,7 +89,7 @@ Region::Region(TR::SegmentProvider &segmentProvider, TR::RawAllocator rawAllocat
          {
          // Case of main heap region as main heap region is constructed using segmentProvider and rawAllocator.
          _collectStackTrace = true;
-         _regionAllocMap = new (PERSISTENT_NEW) RegionLog();
+         _regionAllocMap = new (PERSISTENT_NEW) RegionLog;
          _regionAllocMap->_isHeap = isHeap;
          void *trace[REGION_BACKTRACE_DEPTH + 1];
          unw_backtrace(trace, REGION_BACKTRACE_DEPTH + 1);
@@ -115,7 +115,7 @@ Region::Region(const Region &prototype, bool isHeap) :
          if (_compilation->getOptLevel() >= OMR::Options::_minOptLevelCollected)
             {
             _collectStackTrace = true;
-            _regionAllocMap = new (PERSISTENT_NEW) RegionLog();
+            _regionAllocMap = new (PERSISTENT_NEW) RegionLog;
             _regionAllocMap->_isHeap = isHeap;
             // collect backtrace of the constructor of the region
             void *trace[REGION_BACKTRACE_DEPTH + 1];
@@ -128,7 +128,7 @@ Region::Region(const Region &prototype, bool isHeap) :
          {
          // Case of alias region
          _collectStackTrace = true;
-         _regionAllocMap = new (PERSISTENT_NEW) RegionLog();
+         _regionAllocMap = new (PERSISTENT_NEW) RegionLog;
          _regionAllocMap->_isHeap = isHeap;
          void *trace[REGION_BACKTRACE_DEPTH + 1];
          unw_backtrace(trace, REGION_BACKTRACE_DEPTH + 1);
