@@ -86,8 +86,9 @@ class RegionLog
       int32_t _endTime;
       size_t _bytesAllocated;
 
-      PersistentUnorderedMap<AllocEntry, size_t> *_allocMap; // TODO: change this to actual thing instead of pointer
-      RegionLog(TR::PersistentAllocator *allocator);
+      PersistentUnorderedMap<AllocEntry, size_t> _allocMap; // TODO: change this to actual thing instead of pointer
+      RegionLog();
+      ~RegionLog();
       bool operator==(const RegionLog &other) const 
          {
             return memcmp(_regionTrace, other._regionTrace, sizeof(void *)*REGION_BACKTRACE_DEPTH) == 0;
@@ -148,7 +149,7 @@ class Region
 
 public:
    Region(TR::SegmentProvider &segmentProvider, TR::RawAllocator rawAllocator, bool isHeap = true);
-   Region(const Region &prototype, bool isHeap = true);
+   Region(const Region &prototype, class OMR_EXTENSIBLE Compilation *creator = NULL, bool isHeap = true);
    virtual ~Region() throw();
    void * allocate(const size_t bytes, void * hint = 0);
 
@@ -159,8 +160,8 @@ public:
    struct RegionLog *_regionAllocMap;
    // TR::Comp() local copy
    class OMR_EXTENSIBLE Compilation *_compilation;
-   // opt_level of corresponding compilation
-   int8_t _optLevel;
+   // Flag for collect or not
+   bool _collectStackTrace;
 
    /**
     * @brief A function template to create a Region-managed object instance.

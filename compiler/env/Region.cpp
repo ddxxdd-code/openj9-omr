@@ -41,18 +41,24 @@
 // _minOptLevelCollected Collect only compilations where opt_level >= _minOptLevelCollected, default=0
 
 // Constructor for regionLog to keep the log of each region object
-RegionLog::RegionLog(TR::PersistentAllocator *allocator)
+RegionLog::RegionLog() :
+   _allocMap(PersistentUnorderedMap<AllocEntry, size_t>::allocator_type(TR::Compiler->persistentAllocator())),
+   _methodCompiled(NULL)
    {
-   _methodCompiled = NULL;
-   _allocMap = new (PERSISTENT_NEW) PersistentUnorderedMap<AllocEntry, size_t>(PersistentUnorderedMap<AllocEntry, size_t>::allocator_type(*allocator));
+   }
+
+RegionLog::~RegionLog()
+   {
+   if (_methodCompiled != NULL)
+      {
+      TR::Compiler->persistentAllocator().deallocate(_methodCompiled);
+      }
    }
 
 namespace TR {
 
-// TODO: find where these should be at
 static PersistentVector<RegionLog *> *heapAllocMapList = NULL;
 static Monitor *heapAllocMapListMonitor;
-static PersistentAllocator *_persistentAllocator = NULL;
 
 Region::Region(TR::SegmentProvider &segmentProvider, TR::RawAllocator rawAllocator, bool isHeap) :
    _bytesAllocated(0),
@@ -62,28 +68,38 @@ Region::Region(TR::SegmentProvider &segmentProvider, TR::RawAllocator rawAllocat
    _currentSegment(TR::ref(_initialSegment)),
    _lastDestructable(NULL)
    {
+   _collectStackTrace = false;
    if (OMR::Options::_collectBackTrace >= 1)
       {
-      _regionAllocMap = new (PERSISTENT_NEW) RegionLog(_persistentAllocator);
-      _regionAllocMap->_isHeap = isHeap;
-      // collect backtrace of the constructor of the region
-      void *trace[REGION_BACKTRACE_DEPTH + 1];
-      unw_backtrace(trace, REGION_BACKTRACE_DEPTH + 1);
-      memcpy(_regionAllocMap->_regionTrace, &trace[1], REGION_BACKTRACE_DEPTH * sizeof(void *));
       if (_compilation = TR::comp())
          {
-         _regionAllocMap->_startTime = _compilation->recordEvent();
-         _optLevel = _compilation->getOptLevel();
+         if (_compilation->getOptLevel() >= OMR::Options::_minOptLevelCollected)
+            {
+            _collectStackTrace = true;
+            _regionAllocMap = new (PERSISTENT_NEW) RegionLog();
+            _regionAllocMap->_isHeap = isHeap;
+            // collect backtrace of the constructor of the region
+            void *trace[REGION_BACKTRACE_DEPTH + 1];
+            unw_backtrace(trace, REGION_BACKTRACE_DEPTH + 1);
+            memcpy(_regionAllocMap->_regionTrace, &trace[1], REGION_BACKTRACE_DEPTH * sizeof(void *));
+            _regionAllocMap->_startTime = _compilation->recordEvent();
+            }
          }
       else
          {
+         // Case of main heap region as main heap region is constructed using segmentProvider and rawAllocator.
+         _collectStackTrace = true;
+         _regionAllocMap = new (PERSISTENT_NEW) RegionLog();
+         _regionAllocMap->_isHeap = isHeap;
+         void *trace[REGION_BACKTRACE_DEPTH + 1];
+         unw_backtrace(trace, REGION_BACKTRACE_DEPTH + 1);
+         memcpy(_regionAllocMap->_regionTrace, &trace[1], REGION_BACKTRACE_DEPTH * sizeof(void *));
          _regionAllocMap->_startTime = 0;
-         _optLevel = 0;
          }
       }
    }
 
-Region::Region(const Region &prototype, bool isHeap) :
+Region::Region(const Region &prototype, class OMR_EXTENSIBLE Compilation *creator, bool isHeap) :
    _bytesAllocated(0),
    _segmentProvider(prototype._segmentProvider),
    _rawAllocator(prototype._rawAllocator),
@@ -91,47 +107,58 @@ Region::Region(const Region &prototype, bool isHeap) :
    _currentSegment(TR::ref(_initialSegment)),
    _lastDestructable(NULL)
    {
+   _collectStackTrace = false;
    if (OMR::Options::_collectBackTrace >= 1)
       {
-      _regionAllocMap = new (PERSISTENT_NEW) RegionLog(_persistentAllocator);
-      _regionAllocMap->_isHeap = isHeap;
-      // collect backtrace of the constructor of the region
-      void *trace[REGION_BACKTRACE_DEPTH + 1];
-      unw_backtrace(trace, REGION_BACKTRACE_DEPTH + 1);
-      memcpy(_regionAllocMap->_regionTrace, &trace[1], REGION_BACKTRACE_DEPTH * sizeof(void *));
       if (_compilation = TR::comp())
          {
-         _regionAllocMap->_startTime = _compilation->recordEvent();
-         _optLevel = _compilation->getOptLevel();
+         if (_compilation->getOptLevel() >= OMR::Options::_minOptLevelCollected)
+            {
+            _collectStackTrace = true;
+            _regionAllocMap = new (PERSISTENT_NEW) RegionLog();
+            _regionAllocMap->_isHeap = isHeap;
+            // collect backtrace of the constructor of the region
+            void *trace[REGION_BACKTRACE_DEPTH + 1];
+            unw_backtrace(trace, REGION_BACKTRACE_DEPTH + 1);
+            memcpy(_regionAllocMap->_regionTrace, &trace[1], REGION_BACKTRACE_DEPTH * sizeof(void *));
+            _regionAllocMap->_startTime = _compilation->recordEvent();
+            }
          }
       else
          {
-         _regionAllocMap->_startTime = 0;
-         _optLevel = 0;
+         // Case of alias region
+         if (creator)
+            {
+            _collectStackTrace = true;
+            // alias region, check if this is at desired opt_level
+            if (creator->getOptLevel() >= OMR::Options::_minOptLevelCollected)
+               {
+               _regionAllocMap = new (PERSISTENT_NEW) RegionLog();
+               _regionAllocMap->_isHeap = isHeap;
+               // collect backtrace of the constructor of the region
+               void *trace[REGION_BACKTRACE_DEPTH + 1];
+               unw_backtrace(trace, REGION_BACKTRACE_DEPTH + 1);
+               memcpy(_regionAllocMap->_regionTrace, &trace[1], REGION_BACKTRACE_DEPTH * sizeof(void *));
+               _regionAllocMap->_startTime = creator->recordEvent();
+               }
+            }
          }
       }
    }
 
 Region::~Region() throw()
    {
-      if (OMR::Options::_collectBackTrace >= 2 && _optLevel >= OMR::Options::_minOptLevelCollected)
-         {
-         if (!_compilation)
-            {
-            _regionAllocMap->_endTime = -1;
-            }
-         else
-            {
-            _regionAllocMap->_endTime = _compilation->recordEvent();
-            }
-         // Get total bytes allocated
-         _regionAllocMap->_bytesAllocated = bytesAllocated();
-         // add heapAllocMap to heapAllocMapList
-         TR_ASSERT(heapAllocMapList && heapAllocMapListMonitor, "heapAllocMapList unintialized");
-         OMR::CriticalSection listInsertCS(heapAllocMapListMonitor);
-         heapAllocMapList->push_back(_regionAllocMap);
-         _regionAllocMap = NULL;
-         }
+   if (_collectStackTrace && OMR::Options::_collectBackTrace >= 2)
+      {
+      _regionAllocMap->_endTime = _compilation->recordEvent();
+      // Get total bytes allocated
+      _regionAllocMap->_bytesAllocated = bytesAllocated();
+      // add heapAllocMap to heapAllocMapList
+      TR_ASSERT(heapAllocMapList && heapAllocMapListMonitor, "heapAllocMapList unintialized");
+      OMR::CriticalSection listInsertCS(heapAllocMapListMonitor);
+      heapAllocMapList->push_back(_regionAllocMap);
+      _regionAllocMap = NULL;
+      }
    /*
     * Destroy all object instances that depend on the region
     * to manage their lifetimes.
@@ -159,22 +186,31 @@ Region::~Region() throw()
 void *
 Region::allocate(size_t const size, void *hint)
    {
-   if (OMR::Options::_collectBackTrace >= 1 && size > 0)
+   if (_collectStackTrace && size > 0)
       {
-      // Add compilation information to regionAllocMap
-      if (_regionAllocMap->_methodCompiled == NULL)
+      // Add compilation information to regionAllocMap for main heap region
+      if (_collectStackTrace && _regionAllocMap->_methodCompiled == NULL)
          {
-         if (_compilation || (_compilation = TR::comp()))
+         if (_compilation = TR::comp())
             {
-            _regionAllocMap->_sequenceNumber = _compilation->getSequenceNumber();
-            size_t length = strlen(_compilation->signature()) + 1;
-            _regionAllocMap->_methodCompiled = (char *) _persistentAllocator->allocate(length);
-            memcpy(_regionAllocMap->_methodCompiled, _compilation->signature(), length);
-            _regionAllocMap->_methodCompiled[length-1] = '\0';
-            _optLevel = _compilation->getOptLevel();
+            if (_compilation->getOptLevel() >= OMR::Options::_minOptLevelCollected)
+               {
+               _regionAllocMap->_sequenceNumber = _compilation->getSequenceNumber();
+               size_t length = strlen(_compilation->signature()) + 1;
+               _regionAllocMap->_methodCompiled = (char *) TR::Compiler->persistentAllocator().allocate(length);
+               memcpy(_regionAllocMap->_methodCompiled, _compilation->signature(), length);
+               _regionAllocMap->_methodCompiled[length-1] = '\0';
+               }
+            else
+               {
+               // Not for collected, discard this region's regionLog
+               _collectStackTrace = false;
+               _regionAllocMap->~RegionLog();
+               TR::Compiler->persistentAllocator().deallocate(_regionAllocMap);
+               }
             }
          }
-      // Backtrace allocation
+         // Backtrace allocation, only collect specified regions: 2: stack only, 3: heap only, 4: all scratch memory
       if (OMR::Options::_collectBackTrace >= 4 || (OMR::Options::_collectBackTrace == 2 && !_regionAllocMap->_isHeap) || (OMR::Options::_collectBackTrace == 3 && _regionAllocMap->_isHeap))
          {
          struct AllocEntry entry;
@@ -182,14 +218,14 @@ Region::allocate(size_t const size, void *hint)
          unw_backtrace(trace, MAX_BACKTRACE_SIZE + 1);
          memcpy(entry._trace, &trace[1], MAX_BACKTRACE_SIZE * sizeof(void *));
          TR_ASSERT(_regionAllocMap, "regionAllocMap is not built");
-         auto match = _regionAllocMap->_allocMap->find(entry);
-         if (match != _regionAllocMap->_allocMap->end())
+         auto match = _regionAllocMap->_allocMap.find(entry);
+         if (match != _regionAllocMap->_allocMap.end())
             {
             match->second += size;
             }
          else
             {
-            _regionAllocMap->_allocMap->insert({entry, size});
+            _regionAllocMap->_allocMap.insert({entry, size});
             }
          }
       }
@@ -223,7 +259,6 @@ Region::initAllocMapList(TR::PersistentAllocator *allocator)
    {
       if (OMR::Options::_collectBackTrace >= 1)
       {
-      _persistentAllocator = allocator;
       heapAllocMapList = new (PERSISTENT_NEW) PersistentVector<RegionLog *>(PersistentVector<RegionLog *>::allocator_type(*allocator));
       heapAllocMapListMonitor = Monitor::create("JITCompilerHeapAllocMapListMonitor");
       }
@@ -293,7 +328,7 @@ Region::printRegionAllocations()
                }
             free(temp);
             fprintf(out_file, "\n");
-            for (auto &allocPair : *(region->_allocMap))
+            for (auto &allocPair : region->_allocMap)
                {
                fprintf(out_file, "%zu ", allocPair.second);
                temp = backtrace_symbols((void **)allocPair.first._trace, MAX_BACKTRACE_SIZE);

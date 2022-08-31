@@ -222,7 +222,7 @@ OMR::Compilation::Compilation(
    _allocator(TRCS2MemoryAllocator(m)),
    _method(compilee),
    _arenaAllocator(TR::Allocator(self()->allocator("Arena"))),
-   _aliasRegion(heapMemoryRegion),
+   _aliasRegion(heapMemoryRegion, this, true),
    _ilGenerator(0),
    _ilValidator(NULL),
    _optimizer(0),
