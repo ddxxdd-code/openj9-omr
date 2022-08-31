@@ -159,6 +159,8 @@ public:
    struct RegionLog *_regionAllocMap;
    // TR::Comp() local copy
    class OMR_EXTENSIBLE Compilation *_compilation;
+   // opt_level of corresponding compilation
+   int8_t _optLevel;
 
    /**
     * @brief A function template to create a Region-managed object instance.

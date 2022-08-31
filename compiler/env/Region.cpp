@@ -73,10 +73,12 @@ Region::Region(TR::SegmentProvider &segmentProvider, TR::RawAllocator rawAllocat
       if (_compilation = TR::comp())
          {
          _regionAllocMap->_startTime = _compilation->recordEvent();
+         _optLevel = _compilation->getOptLevel();
          }
       else
          {
          _regionAllocMap->_startTime = 0;
+         _optLevel = 0;
          }
       }
    }
@@ -100,17 +102,19 @@ Region::Region(const Region &prototype, bool isHeap) :
       if (_compilation = TR::comp())
          {
          _regionAllocMap->_startTime = _compilation->recordEvent();
+         _optLevel = _compilation->getOptLevel();
          }
       else
          {
          _regionAllocMap->_startTime = 0;
+         _optLevel = 0;
          }
       }
    }
 
 Region::~Region() throw()
    {
-      if (OMR::Options::_collectBackTrace >= 2 && ((!_compilation) || (_compilation->getOptLevel() >= OMR::Options::_minOptLevelCollected)))
+      if (OMR::Options::_collectBackTrace >= 2 && _optLevel >= OMR::Options::_minOptLevelCollected)
          {
          if (!_compilation)
             {
@@ -167,6 +171,7 @@ Region::allocate(size_t const size, void *hint)
             _regionAllocMap->_methodCompiled = (char *) _persistentAllocator->allocate(length);
             memcpy(_regionAllocMap->_methodCompiled, _compilation->signature(), length);
             _regionAllocMap->_methodCompiled[length-1] = '\0';
+            _optLevel = _compilation->getOptLevel();
             }
          }
       // Backtrace allocation
