@@ -99,7 +99,7 @@ Region::Region(TR::SegmentProvider &segmentProvider, TR::RawAllocator rawAllocat
       }
    }
 
-Region::Region(const Region &prototype, class OMR_EXTENSIBLE Compilation *creator, bool isHeap) :
+Region::Region(const Region &prototype, bool isHeap) :
    _bytesAllocated(0),
    _segmentProvider(prototype._segmentProvider),
    _rawAllocator(prototype._rawAllocator),
@@ -127,21 +127,13 @@ Region::Region(const Region &prototype, class OMR_EXTENSIBLE Compilation *creato
       else
          {
          // Case of alias region
-         if (creator)
-            {
-            _collectStackTrace = true;
-            // alias region, check if this is at desired opt_level
-            if (creator->getOptLevel() >= OMR::Options::_minOptLevelCollected)
-               {
-               _regionAllocMap = new (PERSISTENT_NEW) RegionLog();
-               _regionAllocMap->_isHeap = isHeap;
-               // collect backtrace of the constructor of the region
-               void *trace[REGION_BACKTRACE_DEPTH + 1];
-               unw_backtrace(trace, REGION_BACKTRACE_DEPTH + 1);
-               memcpy(_regionAllocMap->_regionTrace, &trace[1], REGION_BACKTRACE_DEPTH * sizeof(void *));
-               _regionAllocMap->_startTime = creator->recordEvent();
-               }
-            }
+         _collectStackTrace = true;
+         _regionAllocMap = new (PERSISTENT_NEW) RegionLog();
+         _regionAllocMap->_isHeap = isHeap;
+         void *trace[REGION_BACKTRACE_DEPTH + 1];
+         unw_backtrace(trace, REGION_BACKTRACE_DEPTH + 1);
+         memcpy(_regionAllocMap->_regionTrace, &trace[1], REGION_BACKTRACE_DEPTH * sizeof(void *));
+         _regionAllocMap->_startTime = 0;
          }
       }
    }

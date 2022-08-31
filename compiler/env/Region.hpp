@@ -149,7 +149,7 @@ class Region
 
 public:
    Region(TR::SegmentProvider &segmentProvider, TR::RawAllocator rawAllocator, bool isHeap = true);
-   Region(const Region &prototype, class OMR_EXTENSIBLE Compilation *creator = NULL, bool isHeap = true);
+   Region(const Region &prototype, bool isHeap = true);
    virtual ~Region() throw();
    void * allocate(const size_t bytes, void * hint = 0);
 
