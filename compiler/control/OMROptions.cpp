@@ -1291,6 +1291,8 @@ TR::OptionTable OMR::Options::_jitOptions[] = {
    {"zBackTraceFile=", "P<filename>\tPath to file to dump backtrace", TR::Options::setStaticString,  (intptr_t)(&OMR::Options::_backTraceFileName), 0, "P%s"},
    {"zCollectBackTrace=", "D<nnn>\tNumber 0or1or2or3or4",
         TR::Options::setStaticNumeric, (intptr_t)&OMR::Options::_collectBackTrace, 0, "F%d", NOT_IN_SUBSET},
+   {"zMinOptLevelCollected=", "D<nnn>\tNumber 0or1or2or3or4or5",
+        TR::Options::setStaticNumeric, (intptr_t)&OMR::Options::_minOptLevelCollected, 0, "F%d", NOT_IN_SUBSET},
    {"zPrintBackTrace=", "D<nnn>\tNumber 0or1or2",
         TR::Options::setStaticNumeric, (intptr_t)&OMR::Options::_printBackTrace, 0, "F%d", NOT_IN_SUBSET},
    {NULL}
@@ -1728,6 +1730,7 @@ int32_t       OMR::Options::_stopThrottlingTime = 0; // ms. 0 means no expiratio
 
 // option for backtrace
 uint32_t      OMR::Options::_collectBackTrace = 0;
+int32_t       OMR::Options::_minOptLevelCollected = 0;
 uint32_t      OMR::Options::_printBackTrace = 0;
 // setBackTraceDumpFileName("backtrace.log");
 char * OMR::Options::_backTraceFileName = "backtrace.log";

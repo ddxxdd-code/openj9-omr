@@ -1793,6 +1793,9 @@ public:
    // For collectBackTrace control
    // 0: no collection, 1: collect back trace with no insertion, 2: collect stack only, 3: colledct heap only, 4: collect all
    static uint32_t _collectBackTrace;
+   // Collect only optimization level >= threshold
+   // 0: noOpt, 1: cold, 2: warm, 3: hot, 4: very hot, 5: scorching
+   static int32_t _minOptLevelCollected;
    // Control if backtrace to be printed
    // 0: do nothing, 1: loop but no call in loop, 2: print
    static uint32_t _printBackTrace;

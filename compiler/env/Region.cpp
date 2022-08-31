@@ -38,6 +38,7 @@
 //                      2: backtrace stack only (backtrace only stack regions), 3: backtrace heap only, 
 //                      4: backtrace stack and heap
 // _printBackTrace:     0: nothing at the end, 1: no print but loop at the end, 2: print
+// _minOptLevelCollected Collect only compilations where opt_level >= _minOptLevelCollected, default=0
 
 // Constructor for regionLog to keep the log of each region object
 RegionLog::RegionLog(TR::PersistentAllocator *allocator)
@@ -109,7 +110,7 @@ Region::Region(const Region &prototype, bool isHeap) :
 
 Region::~Region() throw()
    {
-      if (OMR::Options::_collectBackTrace >= 2)
+      if (OMR::Options::_collectBackTrace >= 2 && ((!_compilation) || (_compilation->getOptLevel() >= OMR::Options::_minOptLevelCollected)))
          {
          if (!_compilation)
             {
