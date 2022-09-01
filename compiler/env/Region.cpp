@@ -49,10 +49,6 @@ RegionLog::RegionLog() :
 
 RegionLog::~RegionLog()
    {
-   if (_methodCompiled != NULL)
-      {
-      TR::Compiler->persistentAllocator().deallocate(_methodCompiled);
-      }
    }
 
 namespace TR {
