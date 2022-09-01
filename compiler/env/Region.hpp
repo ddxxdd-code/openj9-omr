@@ -95,8 +95,11 @@ class RegionLog
          }
       };
 
+namespace OMR { class Compilation; }
+
 namespace TR {
 
+class Compilation;
 class SegmentProvider;
 class RegionProfiler;
 
@@ -149,7 +152,7 @@ class Region
 
 public:
    Region(TR::SegmentProvider &segmentProvider, TR::RawAllocator rawAllocator, bool isHeap = true);
-   Region(const Region &prototype, bool isHeap = true);
+   Region(const Region &prototype, OMR::Compilation *comp = NULL, bool isHeap = true);
    virtual ~Region() throw();
    void * allocate(const size_t bytes, void * hint = 0);
 
@@ -159,7 +162,7 @@ public:
    // RegionLog to collect all allocations inside this Region instance
    struct RegionLog *_regionAllocMap;
    // TR::Comp() local copy
-   class OMR_EXTENSIBLE Compilation *_compilation;
+   TR::Compilation *_compilation;
    // Flag for collect or not
    bool _collectStackTrace;
 
