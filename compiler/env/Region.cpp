@@ -83,6 +83,7 @@ Region::Region(TR::SegmentProvider &segmentProvider, TR::RawAllocator rawAllocat
             void *trace[REGION_BACKTRACE_DEPTH + 1];
             unw_backtrace(trace, REGION_BACKTRACE_DEPTH + 1);
             memcpy(_regionAllocMap->_regionTrace, &trace[1], REGION_BACKTRACE_DEPTH * sizeof(void *));
+            _regionAllocMap->_sequenceNumber = _compilation->getSequenceNumber();
             size_t length = strlen(_compilation->signature()) + 1;
             _regionAllocMap->_methodCompiled = (char *) TR::Compiler->persistentAllocator().allocate(length);
             memcpy(_regionAllocMap->_methodCompiled, _compilation->signature(), length);
@@ -126,6 +127,7 @@ Region::Region(const Region &prototype, OMR::Compilation *comp, bool isHeap) :
             void *trace[REGION_BACKTRACE_DEPTH + 1];
             unw_backtrace(trace, REGION_BACKTRACE_DEPTH + 1);
             memcpy(_regionAllocMap->_regionTrace, &trace[1], REGION_BACKTRACE_DEPTH * sizeof(void *));
+            _regionAllocMap->_sequenceNumber = _compilation->getSequenceNumber();
             size_t length = strlen(_compilation->signature()) + 1;
             _regionAllocMap->_methodCompiled = (char *) TR::Compiler->persistentAllocator().allocate(length);
             memcpy(_regionAllocMap->_methodCompiled, _compilation->signature(), length);
