@@ -85,6 +85,8 @@ class RegionLog
       int32_t _startTime;
       int32_t _endTime;
       size_t _bytesAllocated;
+      size_t _bytesSegmentProviderAllocated;
+      size_t _bytesSegmentProviderFreed;
 
       PersistentUnorderedMap<AllocEntry, size_t> _allocMap; // TODO: change this to actual thing instead of pointer
       RegionLog();
