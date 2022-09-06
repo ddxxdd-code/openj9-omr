@@ -192,7 +192,7 @@ Region::~Region() throw()
          _segmentProvider.release(latestSegment);
          }
       size_t postReleaseBytesAllocated = _segmentProvider.bytesAllocated();
-      _regionAllocMap->_bytesSegmentProviderFreed = preReleaseBytesAllocated - postReleaseBytesAllocated;
+      _regionAllocMap->_bytesSegmentProviderFreed += preReleaseBytesAllocated - postReleaseBytesAllocated;
 
       // Get total bytes allocated
       _regionAllocMap->_bytesAllocated = bytesAllocated();
