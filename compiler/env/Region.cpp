@@ -164,6 +164,7 @@ Region::~Region() throw()
     * Destroy all object instances that depend on the region
     * to manage their lifetimes.
     */
+   size_t preReleaseBytesAllocated = _segmentProvider.regionBytesInUse();
    Destructable *lastDestructable = _lastDestructable;
    while (lastDestructable)
       {
@@ -181,7 +182,6 @@ Region::~Region() throw()
          {
          _regionAllocMap->_endTime = -1;
          }
-      size_t preReleaseBytesAllocated = _segmentProvider.bytesAllocated();
       for (
       TR::reference_wrapper<TR::MemorySegment> latestSegment(_currentSegment);
       latestSegment.get() != _initialSegment;
@@ -191,7 +191,7 @@ Region::~Region() throw()
          _currentSegment = TR::ref(latestSegment.get().unlink());
          _segmentProvider.release(latestSegment);
          }
-      size_t postReleaseBytesAllocated = _segmentProvider.bytesAllocated();
+      size_t postReleaseBytesAllocated = _segmentProvider.regionBytesInUse();
       _regionAllocMap->_bytesSegmentProviderFreed += preReleaseBytesAllocated - postReleaseBytesAllocated;
 
       // Get total bytes allocated
@@ -270,11 +270,11 @@ Region::allocate(size_t const size, void *hint)
       return _currentSegment.get().allocate(roundedSize);
       }
    // TODO: get current allocated from _segmentProvider, get difference after, accumulate to region
-   size_t preRequestBytesAllocated = _segmentProvider.bytesAllocated();
+   size_t preRequestBytesAllocated = _segmentProvider.regionBytesInUse();
    TR::MemorySegment &newSegment = _segmentProvider.request(roundedSize);
    if (_collectStackTrace && roundedSize > 0)
       {
-      size_t postRequestBytesAllocated = _segmentProvider.bytesAllocated();
+      size_t postRequestBytesAllocated = _segmentProvider.regionBytesInUse();
       _regionAllocMap->_bytesSegmentProviderAllocated += postRequestBytesAllocated - preRequestBytesAllocated;
       }
    TR_ASSERT(newSegment.remaining() >= roundedSize, "Allocated segment is too small");

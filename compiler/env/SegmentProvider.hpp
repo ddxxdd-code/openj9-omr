@@ -38,6 +38,7 @@ public:
    virtual void release(TR::MemorySegment& segment) throw() = 0;
    size_t defaultSegmentSize() { return _defaultSegmentSize; }
    virtual size_t bytesAllocated() const throw() = 0;
+   virtual size_t regionBytesInUse() const throw() = 0;
 
 
 protected:
