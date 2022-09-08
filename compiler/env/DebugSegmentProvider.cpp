@@ -129,6 +129,12 @@ TR::DebugSegmentProvider::regionBytesInUse() const throw()
    }
 
 size_t
+TR::DebugSegmentProvider::regionRealBytesInUse() const throw()
+   {
+   return _bytesAllocated;
+   }
+
+size_t
 TR::DebugSegmentProvider::allocationLimit() const throw()
    {
    return static_cast<size_t>(-1);

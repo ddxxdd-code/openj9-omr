@@ -57,6 +57,7 @@ public:
    virtual size_t bytesAllocated() const throw();
    virtual size_t regionBytesAllocated() const throw();
    virtual size_t regionBytesInUse() const throw();
+   virtual size_t regionRealBytesInUse() const throw();
    virtual size_t systemBytesAllocated() const throw();
    virtual size_t allocationLimit() const throw();
    virtual void setAllocationLimit(size_t);

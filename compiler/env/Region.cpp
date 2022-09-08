@@ -45,7 +45,11 @@ RegionLog::RegionLog() :
    _allocMap(PersistentUnorderedMap<AllocEntry, size_t>::allocator_type(TR::Compiler->persistentAllocator())),
    _methodCompiled(NULL),
    _bytesSegmentProviderAllocated(0),
-   _bytesSegmentProviderFreed(0)
+   _bytesSegmentProviderFreed(0),
+   _bytesSegmentProviderInUseAllocated(0),
+   _bytesSegmentProviderInUseFreed(0),
+   _bytesSegmentProviderRealInUseAllocated(0),
+   _bytesSegmentProviderRealInUseFreed(0)
    {
    }
 
@@ -164,7 +168,9 @@ Region::~Region() throw()
     * Destroy all object instances that depend on the region
     * to manage their lifetimes.
     */
-   size_t preReleaseBytesAllocated = _segmentProvider.regionBytesInUse();
+   size_t preReleaseBytesAllocated = _segmentProvider.bytesAllocated();
+   size_t preReleaseBytesInUse = _segmentProvider.regionBytesInUse();
+   size_t preReleaseBytesRealInUse = _segmentProvider.regionRealBytesInUse();
    Destructable *lastDestructable = _lastDestructable;
    while (lastDestructable)
       {
@@ -191,8 +197,12 @@ Region::~Region() throw()
          _currentSegment = TR::ref(latestSegment.get().unlink());
          _segmentProvider.release(latestSegment);
          }
-      size_t postReleaseBytesAllocated = _segmentProvider.regionBytesInUse();
+      size_t postReleaseBytesAllocated = _segmentProvider.bytesAllocated();
+      size_t postReleaseBytesInUse = _segmentProvider.regionBytesInUse();
+      size_t postReleaseBytesRealInUse = _segmentProvider.regionRealBytesInUse();
       _regionAllocMap->_bytesSegmentProviderFreed += preReleaseBytesAllocated - postReleaseBytesAllocated;
+      _regionAllocMap->_bytesSegmentProviderInUseFreed += preReleaseBytesInUse - postReleaseBytesInUse;
+      _regionAllocMap->_bytesSegmentProviderRealInUseFreed += preReleaseBytesRealInUse - postReleaseBytesRealInUse;
 
       // Get total bytes allocated
       _regionAllocMap->_bytesAllocated = bytesAllocated();
@@ -270,12 +280,18 @@ Region::allocate(size_t const size, void *hint)
       return _currentSegment.get().allocate(roundedSize);
       }
    // TODO: get current allocated from _segmentProvider, get difference after, accumulate to region
-   size_t preRequestBytesAllocated = _segmentProvider.regionBytesInUse();
+   size_t preRequestBytesAllocated = _segmentProvider.bytesAllocated();
+   size_t preRequestBytesInUse = _segmentProvider.regionBytesInUse();
+   size_t preRequestBytesRealInUse = _segmentProvider.regionRealBytesInUse();
    TR::MemorySegment &newSegment = _segmentProvider.request(roundedSize);
    if (_collectStackTrace && roundedSize > 0)
       {
-      size_t postRequestBytesAllocated = _segmentProvider.regionBytesInUse();
+      size_t postRequestBytesAllocated = _segmentProvider.bytesAllocated();
+      size_t postRequestBytesInUse = _segmentProvider.regionBytesInUse();
+      size_t postRequestBytesRealInUse = _segmentProvider.regionRealBytesInUse();
       _regionAllocMap->_bytesSegmentProviderAllocated += postRequestBytesAllocated - preRequestBytesAllocated;
+      _regionAllocMap->_bytesSegmentProviderInUseAllocated += postRequestBytesInUse - preRequestBytesInUse;
+      _regionAllocMap->_bytesSegmentProviderRealInUseAllocated += postRequestBytesRealInUse - preRequestBytesRealInUse;
       }
    TR_ASSERT(newSegment.remaining() >= roundedSize, "Allocated segment is too small");
    newSegment.link(_currentSegment.get());
@@ -347,7 +363,11 @@ Region::printRegionAllocations()
                }
             if (region->_methodCompiled)
                {
-               fprintf(out_file, "%s %d %d %d %zu %zu %zu\n", region->_methodCompiled, region->_sequenceNumber, region->_startTime, region->_endTime, region->_bytesAllocated, region->_bytesSegmentProviderAllocated, region->_bytesSegmentProviderFreed); // TODO: change printf to signify that _sequenceNumber is uint32_t and optLevel is int32_t
+               fprintf(out_file, "%s %d %d %d %zu %zu %zu %zu %zu %zu %zu\n", 
+               region->_methodCompiled, region->_sequenceNumber, region->_startTime, region->_endTime, region->_bytesAllocated, 
+               region->_bytesSegmentProviderAllocated, region->_bytesSegmentProviderFreed, 
+               region->_bytesSegmentProviderInUseAllocated, region->_bytesSegmentProviderInUseFreed,
+               region->_bytesSegmentProviderRealInUseAllocated, region->_bytesSegmentProviderRealInUseFreed); // TODO: change printf to signify that _sequenceNumber is uint32_t and optLevel is int32_t
                }
             else
                {

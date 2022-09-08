@@ -39,7 +39,7 @@ public:
    size_t defaultSegmentSize() { return _defaultSegmentSize; }
    virtual size_t bytesAllocated() const throw() = 0;
    virtual size_t regionBytesInUse() const throw() = 0;
-
+   virtual size_t regionRealBytesInUse() const throw() = 0;
 
 protected:
    explicit SegmentProvider(size_t defaultSegmentSize) :
