@@ -57,8 +57,12 @@ TR::DebugSegmentProvider::~DebugSegmentProvider() throw()
    }
 
 TR::MemorySegment &
-TR::DebugSegmentProvider::request(size_t requiredSize)
+TR::DebugSegmentProvider::request(size_t requiredSize, bool inRegion)
    {
+   if (!inRegion) 
+      {
+      printf("Request outside of region of %zu Bytes\n", requiredSize);
+      }
    size_t adjustedSize = ( ( requiredSize + (defaultSegmentSize() - 1) ) / defaultSegmentSize() ) * defaultSegmentSize();
 #if (defined(LINUX) && !defined(OMRZTPF)) || defined(__APPLE__) || defined(_AIX)
    void *newSegmentArea = mmap(NULL, adjustedSize, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);

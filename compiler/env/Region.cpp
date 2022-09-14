@@ -283,7 +283,7 @@ Region::allocate(size_t const size, void *hint)
    size_t preRequestBytesAllocated = _segmentProvider.bytesAllocated();
    size_t preRequestBytesInUse = _segmentProvider.regionBytesInUse();
    size_t preRequestBytesRealInUse = _segmentProvider.regionRealBytesInUse();
-   TR::MemorySegment &newSegment = _segmentProvider.request(roundedSize);
+   TR::MemorySegment &newSegment = _segmentProvider.request(roundedSize, true);
    if (_collectStackTrace && roundedSize > 0)
       {
       size_t postRequestBytesAllocated = _segmentProvider.bytesAllocated();
