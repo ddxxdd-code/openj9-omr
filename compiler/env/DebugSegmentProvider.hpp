@@ -52,7 +52,7 @@ class DebugSegmentProvider : public TR::SegmentAllocator
 public:
    DebugSegmentProvider(size_t defaultSegmentSize, TR::RawAllocator rawAllocator);
    ~DebugSegmentProvider() throw();
-   virtual TR::MemorySegment &request(size_t requiredSize);
+   virtual TR::MemorySegment &request(size_t requiredSize, bool inRegion=false);
    virtual void release(TR::MemorySegment &segment) throw();
    virtual size_t bytesAllocated() const throw();
    virtual size_t regionBytesAllocated() const throw();

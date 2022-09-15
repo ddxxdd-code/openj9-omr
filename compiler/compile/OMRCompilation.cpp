@@ -205,6 +205,7 @@ OMR::Compilation::Compilation(
       TR_Memory *m,
       TR_OptimizationPlan *optimizationPlan,
       TR::Environment *target) :
+   _timestampCounter(0),
    _signature(compilee->signature(m)),
    _options(&options),
    _heapMemoryRegion(heapMemoryRegion),
@@ -463,8 +464,6 @@ OMR::Compilation::Compilation(
    // Assign sequence number for this compilation
    _sequenceNumber = VM_AtomicSupport::addU32(&OMR::Compilation::compilationSequenceNumber, 1) - 1;
 
-   // Initialize the compilation timestamp to 0 on creation
-   _timestampCounter = 0;
    }
 
 OMR::Compilation::~Compilation() throw()

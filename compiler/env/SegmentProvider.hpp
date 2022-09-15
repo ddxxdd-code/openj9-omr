@@ -34,7 +34,7 @@ class MemorySegment;
 class SegmentProvider
    {
 public:
-   virtual TR::MemorySegment& request(size_t requiredSize) = 0;
+   virtual TR::MemorySegment& request(size_t requiredSize, bool inRegion=false) = 0;
    virtual void release(TR::MemorySegment& segment) throw() = 0;
    size_t defaultSegmentSize() { return _defaultSegmentSize; }
    virtual size_t bytesAllocated() const throw() = 0;
