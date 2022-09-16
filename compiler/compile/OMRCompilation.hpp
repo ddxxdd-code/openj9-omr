@@ -483,10 +483,13 @@ public:
    TR::HCRMode getHCRMode();
 
    // compilation sequernce number
-   int32_t getSequenceNumber() { return _sequenceNumber; }
+   uint32_t getSequenceNumber() { return _sequenceNumber; }
 
    // increase the timestamp counter and return the timestamp
-   int32_t recordEvent() {return ++_timestampCounter; }
+   int32_t recordEvent() { return ++_timestampCounter; }
+
+   void recordRegion() { _regionAlive++; }
+   void removeRegion() { _regionAlive--; }
 
    // ==========================================================================
    // Symbol reference
@@ -1327,6 +1330,9 @@ private:
 
    // The counter to generate time stamp for region sequence in the same compilation
    uint32_t                          _timestampCounter;
+
+   // The counter to keep track of number of regions alive
+   int32_t                           _regionAlive;
 
    ListHeadAndTail<char*> _gpuPtxList;
    ListHeadAndTail<int32_t> _gpuKernelLineNumberList; //TODO: fix to get real line numbers

@@ -80,6 +80,7 @@ Region::Region(TR::SegmentProvider &segmentProvider, TR::RawAllocator rawAllocat
       {
       if (_compilation = TR::comp())
          {
+         _compilation->recordRegion();
          if (_compilation->getOptLevel() >= OMR::Options::_minOptLevelCollected)
             {
             _collectStackTrace = true;
@@ -95,6 +96,7 @@ Region::Region(TR::SegmentProvider &segmentProvider, TR::RawAllocator rawAllocat
             memcpy(_regionAllocMap->_methodCompiled, _compilation->signature(), length);
             _regionAllocMap->_methodCompiled[length-1] = '\0';
             _regionAllocMap->_startTime = _compilation->recordEvent();
+            _compilation->recordRegion();
             }
          }
       else
@@ -139,6 +141,7 @@ Region::Region(const Region &prototype, OMR::Compilation *comp, bool isHeap) :
             memcpy(_regionAllocMap->_methodCompiled, _compilation->signature(), length);
             _regionAllocMap->_methodCompiled[length-1] = '\0';
             _regionAllocMap->_startTime = _compilation->recordEvent();
+            _compilation->recordRegion();
             }
          }
       else
@@ -157,6 +160,7 @@ Region::Region(const Region &prototype, OMR::Compilation *comp, bool isHeap) :
             unw_backtrace(trace, REGION_BACKTRACE_DEPTH + 1);
             memcpy(_regionAllocMap->_regionTrace, &trace[1], REGION_BACKTRACE_DEPTH * sizeof(void *));
             _regionAllocMap->_startTime = comp->recordEvent();
+            comp->recordRegion();
             }
          }
       }
@@ -183,10 +187,12 @@ Region::~Region() throw()
       if (_compilation)
          {
          _regionAllocMap->_endTime = _compilation->recordEvent();
+         _compilation->removeRegion();
          }
       else
          {
          _regionAllocMap->_endTime = -1;
+         printf("destruction without compilation associated\n");
          }
       for (
       TR::reference_wrapper<TR::MemorySegment> latestSegment(_currentSegment);
@@ -245,6 +251,8 @@ Region::allocate(size_t const size, void *hint)
                _regionAllocMap->_methodCompiled = (char *) TR::Compiler->persistentAllocator().allocate(length);
                memcpy(_regionAllocMap->_methodCompiled, _compilation->signature(), length);
                _regionAllocMap->_methodCompiled[length-1] = '\0';
+               printf("before main heap region, segment size: %zu\n", _segmentProvider.bytesAllocated());
+               _compilation->recordRegion();
                }
             else
                {
@@ -274,15 +282,15 @@ Region::allocate(size_t const size, void *hint)
             }
          }
       }
+   // TODO: get current allocated from _segmentProvider, get difference after, accumulate to region
+   size_t preRequestBytesAllocated = _segmentProvider.bytesAllocated();
+   size_t preRequestBytesInUse = _segmentProvider.regionBytesInUse();
+   size_t preRequestBytesRealInUse = _segmentProvider.regionRealBytesInUse();
    if (_currentSegment.get().remaining() >= roundedSize)
       {
       _bytesAllocated += roundedSize;
       return _currentSegment.get().allocate(roundedSize);
       }
-   // TODO: get current allocated from _segmentProvider, get difference after, accumulate to region
-   size_t preRequestBytesAllocated = _segmentProvider.bytesAllocated();
-   size_t preRequestBytesInUse = _segmentProvider.regionBytesInUse();
-   size_t preRequestBytesRealInUse = _segmentProvider.regionRealBytesInUse();
    TR::MemorySegment &newSegment = _segmentProvider.request(roundedSize, true);
    if (_collectStackTrace && roundedSize > 0)
       {

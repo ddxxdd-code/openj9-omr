@@ -206,6 +206,7 @@ OMR::Compilation::Compilation(
       TR_OptimizationPlan *optimizationPlan,
       TR::Environment *target) :
    _timestampCounter(0),
+   _regionAlive(0),
    _signature(compilee->signature(m)),
    _options(&options),
    _heapMemoryRegion(heapMemoryRegion),
@@ -468,6 +469,10 @@ OMR::Compilation::Compilation(
 
 OMR::Compilation::~Compilation() throw()
    {
+   if (_regionAlive)
+      {
+      printf("number of region remains undestructed in compilation %d is %d\n", _sequenceNumber, _regionAlive);
+      }
    }
 
 
