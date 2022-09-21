@@ -44,6 +44,9 @@
 RegionLog::RegionLog() :
    _allocMap(PersistentUnorderedMap<AllocEntry, size_t>::allocator_type(TR::Compiler->persistentAllocator())),
    _methodCompiled(NULL),
+   _startTime(-1),
+   _endTime(-1),
+   _bytesAllocated(0),
    _bytesSegmentProviderAllocated(0),
    _bytesSegmentProviderFreed(0),
    _bytesSegmentProviderInUseAllocated(0),
@@ -97,6 +100,10 @@ Region::Region(TR::SegmentProvider &segmentProvider, TR::RawAllocator rawAllocat
             _regionAllocMap->_methodCompiled[length-1] = '\0';
             _regionAllocMap->_startTime = _compilation->recordEvent();
             _compilation->recordRegion();
+            // add heapAllocMap to heapAllocMapList
+            TR_ASSERT(heapAllocMapList && heapAllocMapListMonitor, "heapAllocMapList unintialized");
+            OMR::CriticalSection listInsertCS(heapAllocMapListMonitor);
+            heapAllocMapList->push_back(_regionAllocMap);
             }
          }
       else
@@ -142,6 +149,10 @@ Region::Region(const Region &prototype, OMR::Compilation *comp, bool isHeap) :
             _regionAllocMap->_methodCompiled[length-1] = '\0';
             _regionAllocMap->_startTime = _compilation->recordEvent();
             _compilation->recordRegion();
+            // add heapAllocMap to heapAllocMapList
+            TR_ASSERT(heapAllocMapList && heapAllocMapListMonitor, "heapAllocMapList unintialized");
+            OMR::CriticalSection listInsertCS(heapAllocMapListMonitor);
+            heapAllocMapList->push_back(_regionAllocMap);
             }
          }
       else
@@ -161,6 +172,10 @@ Region::Region(const Region &prototype, OMR::Compilation *comp, bool isHeap) :
             memcpy(_regionAllocMap->_regionTrace, &trace[1], REGION_BACKTRACE_DEPTH * sizeof(void *));
             _regionAllocMap->_startTime = comp->recordEvent();
             comp->recordRegion();
+            // add heapAllocMap to heapAllocMapList
+            TR_ASSERT(heapAllocMapList && heapAllocMapListMonitor, "heapAllocMapList unintialized");
+            OMR::CriticalSection listInsertCS(heapAllocMapListMonitor);
+            heapAllocMapList->push_back(_regionAllocMap);
             }
          }
       }
@@ -212,10 +227,10 @@ Region::~Region() throw()
 
       // Get total bytes allocated
       _regionAllocMap->_bytesAllocated = bytesAllocated();
-      // add heapAllocMap to heapAllocMapList
-      TR_ASSERT(heapAllocMapList && heapAllocMapListMonitor, "heapAllocMapList unintialized");
-      OMR::CriticalSection listInsertCS(heapAllocMapListMonitor);
-      heapAllocMapList->push_back(_regionAllocMap);
+      // // add heapAllocMap to heapAllocMapList
+      // TR_ASSERT(heapAllocMapList && heapAllocMapListMonitor, "heapAllocMapList unintialized");
+      // OMR::CriticalSection listInsertCS(heapAllocMapListMonitor);
+      // heapAllocMapList->push_back(_regionAllocMap);
       _regionAllocMap = NULL;
       }
    else
@@ -251,8 +266,11 @@ Region::allocate(size_t const size, void *hint)
                _regionAllocMap->_methodCompiled = (char *) TR::Compiler->persistentAllocator().allocate(length);
                memcpy(_regionAllocMap->_methodCompiled, _compilation->signature(), length);
                _regionAllocMap->_methodCompiled[length-1] = '\0';
-               printf("before main heap region, segment size: %zu\n", _segmentProvider.bytesAllocated());
                _compilation->recordRegion();
+               // add heapAllocMap to heapAllocMapList
+               TR_ASSERT(heapAllocMapList && heapAllocMapListMonitor, "heapAllocMapList unintialized");
+               OMR::CriticalSection listInsertCS(heapAllocMapListMonitor);
+               heapAllocMapList->push_back(_regionAllocMap);
                }
             else
                {
