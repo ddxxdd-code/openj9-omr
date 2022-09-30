@@ -85,6 +85,8 @@ class RegionLog
       int32_t _startTime;
       int32_t _endTime;
       size_t _bytesAllocated;
+      size_t _startBytesAllocated;
+      size_t _endBytesAllocated;
       size_t _bytesSegmentProviderAllocated;
       size_t _bytesSegmentProviderFreed;
       size_t _bytesSegmentProviderInUseAllocated;

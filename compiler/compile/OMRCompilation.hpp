@@ -68,6 +68,7 @@ namespace OMR { typedef OMR::Compilation CompilationConnector; }
 #include "ras/Debug.hpp"
 #include "ras/DebugCounter.hpp"
 #include "ras/ILValidationStrategies.hpp"
+#include "AtomicSupport.hpp"
 
 
 
@@ -486,10 +487,10 @@ public:
    uint32_t getSequenceNumber() { return _sequenceNumber; }
 
    // increase the timestamp counter and return the timestamp
-   int32_t recordEvent() { return ++_timestampCounter; }
+   uint32_t recordEvent() { return VM_AtomicSupport::addU32(&_timestampCounter, 1); }
 
-   void recordRegion() { _regionAlive++; }
-   void removeRegion() { _regionAlive--; }
+   void recordRegion() { VM_AtomicSupport::addU32(&_regionAlive, 1); }
+   void removeRegion() { VM_AtomicSupport::subtractU32(&_regionAlive, 1); }
 
    // ==========================================================================
    // Symbol reference
@@ -1332,7 +1333,7 @@ private:
    uint32_t                          _timestampCounter;
 
    // The counter to keep track of number of regions alive
-   int32_t                           _regionAlive;
+   uint32_t                           _regionAlive;
 
    ListHeadAndTail<char*> _gpuPtxList;
    ListHeadAndTail<int32_t> _gpuKernelLineNumberList; //TODO: fix to get real line numbers

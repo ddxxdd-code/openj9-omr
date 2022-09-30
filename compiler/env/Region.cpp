@@ -42,7 +42,6 @@
 
 // Constructor for regionLog to keep the log of each region object
 RegionLog::RegionLog() :
-   _allocMap(PersistentUnorderedMap<AllocEntry, size_t>::allocator_type(TR::Compiler->persistentAllocator())),
    _methodCompiled(NULL),
    _startTime(-1),
    _endTime(-1),
@@ -52,7 +51,10 @@ RegionLog::RegionLog() :
    _bytesSegmentProviderInUseAllocated(0),
    _bytesSegmentProviderInUseFreed(0),
    _bytesSegmentProviderRealInUseAllocated(0),
-   _bytesSegmentProviderRealInUseFreed(0)
+   _bytesSegmentProviderRealInUseFreed(0),
+   _startBytesAllocated(0),
+   _endBytesAllocated(0),
+   _allocMap(PersistentUnorderedMap<AllocEntry, size_t>::allocator_type(TR::Compiler->persistentAllocator()))
    {
    }
 
@@ -99,6 +101,7 @@ Region::Region(TR::SegmentProvider &segmentProvider, TR::RawAllocator rawAllocat
             memcpy(_regionAllocMap->_methodCompiled, _compilation->signature(), length);
             _regionAllocMap->_methodCompiled[length-1] = '\0';
             _regionAllocMap->_startTime = _compilation->recordEvent();
+            _regionAllocMap->_startBytesAllocated = _segmentProvider.bytesAllocated();
             _compilation->recordRegion();
             // add heapAllocMap to heapAllocMapList
             TR_ASSERT(heapAllocMapList && heapAllocMapListMonitor, "heapAllocMapList unintialized");
@@ -116,6 +119,7 @@ Region::Region(TR::SegmentProvider &segmentProvider, TR::RawAllocator rawAllocat
          unw_backtrace(trace, REGION_BACKTRACE_DEPTH + 1);
          memcpy(_regionAllocMap->_regionTrace, &trace[1], REGION_BACKTRACE_DEPTH * sizeof(void *));
          _regionAllocMap->_startTime = 0;
+         _regionAllocMap->_startBytesAllocated = _segmentProvider.bytesAllocated();
          }
       }
    }
@@ -148,6 +152,7 @@ Region::Region(const Region &prototype, OMR::Compilation *comp, bool isHeap) :
             memcpy(_regionAllocMap->_methodCompiled, _compilation->signature(), length);
             _regionAllocMap->_methodCompiled[length-1] = '\0';
             _regionAllocMap->_startTime = _compilation->recordEvent();
+            _regionAllocMap->_startBytesAllocated = _segmentProvider.bytesAllocated();
             _compilation->recordRegion();
             // add heapAllocMap to heapAllocMapList
             TR_ASSERT(heapAllocMapList && heapAllocMapListMonitor, "heapAllocMapList unintialized");
@@ -171,6 +176,7 @@ Region::Region(const Region &prototype, OMR::Compilation *comp, bool isHeap) :
             unw_backtrace(trace, REGION_BACKTRACE_DEPTH + 1);
             memcpy(_regionAllocMap->_regionTrace, &trace[1], REGION_BACKTRACE_DEPTH * sizeof(void *));
             _regionAllocMap->_startTime = comp->recordEvent();
+            _regionAllocMap->_startBytesAllocated = _segmentProvider.bytesAllocated();
             comp->recordRegion();
             // add heapAllocMap to heapAllocMapList
             TR_ASSERT(heapAllocMapList && heapAllocMapListMonitor, "heapAllocMapList unintialized");
@@ -227,6 +233,7 @@ Region::~Region() throw()
 
       // Get total bytes allocated
       _regionAllocMap->_bytesAllocated = bytesAllocated();
+      _regionAllocMap->_endBytesAllocated = _segmentProvider.bytesAllocated();
       // // add heapAllocMap to heapAllocMapList
       // TR_ASSERT(heapAllocMapList && heapAllocMapListMonitor, "heapAllocMapList unintialized");
       // OMR::CriticalSection listInsertCS(heapAllocMapListMonitor);
@@ -389,11 +396,12 @@ Region::printRegionAllocations()
                }
             if (region->_methodCompiled)
                {
-               fprintf(out_file, "%s %d %d %d %zu %zu %zu %zu %zu %zu %zu\n", 
+               fprintf(out_file, "%s %d %d %d %zu %zu %zu %zu %zu %zu %zu %zu %zu\n", 
                region->_methodCompiled, region->_sequenceNumber, region->_startTime, region->_endTime, region->_bytesAllocated, 
                region->_bytesSegmentProviderAllocated, region->_bytesSegmentProviderFreed, 
                region->_bytesSegmentProviderInUseAllocated, region->_bytesSegmentProviderInUseFreed,
-               region->_bytesSegmentProviderRealInUseAllocated, region->_bytesSegmentProviderRealInUseFreed); // TODO: change printf to signify that _sequenceNumber is uint32_t and optLevel is int32_t
+               region->_bytesSegmentProviderRealInUseAllocated, region->_bytesSegmentProviderRealInUseFreed,
+               region->_startBytesAllocated, region->_endBytesAllocated); // TODO: change printf to signify that _sequenceNumber is uint32_t and optLevel is int32_t
                }
             else
                {
