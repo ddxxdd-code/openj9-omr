@@ -43,7 +43,7 @@
 // Constructor for regionLog to keep the log of each region object
 RegionLog::RegionLog() :
    _methodCompiled(NULL),
-   _startTime(-1),
+   _startTime(-2),
    _endTime(-1),
    _bytesAllocated(0),
    _bytesSegmentProviderAllocated(0),
@@ -78,16 +78,19 @@ Region::Region(TR::SegmentProvider &segmentProvider, TR::RawAllocator rawAllocat
    _rawAllocator(rawAllocator),
    _initialSegment(_initialSegmentArea.data, INITIAL_SEGMENT_SIZE),
    _currentSegment(TR::ref(_initialSegment)),
-   _lastDestructable(NULL)
+   _lastDestructable(NULL),
+   _collectStackTrace(false)
    {
-   _collectStackTrace = false;
    if (OMR::Options::_collectBackTrace >= 1)
       {
-      if (_compilation = TR::comp())
+      if (TR::comp())
          {
+         _compilation = TR::comp();
          _compilation->recordRegion();
          if (_compilation->getOptLevel() >= OMR::Options::_minOptLevelCollected)
             {
+            size_t preCreateBytesAllocated = _segmentProvider.bytesAllocated();
+
             _collectStackTrace = true;
             _regionAllocMap = new (PERSISTENT_NEW) RegionLog;
             _regionAllocMap->_isHeap = isHeap;
@@ -107,11 +110,18 @@ Region::Region(TR::SegmentProvider &segmentProvider, TR::RawAllocator rawAllocat
             TR_ASSERT(heapAllocMapList && heapAllocMapListMonitor, "heapAllocMapList unintialized");
             OMR::CriticalSection listInsertCS(heapAllocMapListMonitor);
             heapAllocMapList->push_back(_regionAllocMap);
+
+            size_t postCreateBytesAllocated = _segmentProvider.bytesAllocated();
+            _regionAllocMap->_bytesSegmentProviderAllocated += postCreateBytesAllocated - preCreateBytesAllocated;
+            if (postCreateBytesAllocated - preCreateBytesAllocated)
+               printf("segment provider changed in creation of region\n");
             }
          }
       else
          {
          // Case of main heap region as main heap region is constructed using segmentProvider and rawAllocator.
+         size_t preCreateBytesAllocated = _segmentProvider.bytesAllocated();
+
          _collectStackTrace = true;
          _regionAllocMap = new (PERSISTENT_NEW) RegionLog;
          _regionAllocMap->_isHeap = isHeap;
@@ -120,6 +130,10 @@ Region::Region(TR::SegmentProvider &segmentProvider, TR::RawAllocator rawAllocat
          memcpy(_regionAllocMap->_regionTrace, &trace[1], REGION_BACKTRACE_DEPTH * sizeof(void *));
          _regionAllocMap->_startTime = 0;
          _regionAllocMap->_startBytesAllocated = _segmentProvider.bytesAllocated();
+
+         _regionAllocMap->_bytesSegmentProviderAllocated += _regionAllocMap->_startBytesAllocated - preCreateBytesAllocated;
+         if (_regionAllocMap->_startBytesAllocated - preCreateBytesAllocated)
+               printf("segment provider changed in creation of main heap region\n");
          }
       }
    }
@@ -130,15 +144,18 @@ Region::Region(const Region &prototype, OMR::Compilation *comp, bool isHeap) :
    _rawAllocator(prototype._rawAllocator),
    _initialSegment(_initialSegmentArea.data, INITIAL_SEGMENT_SIZE),
    _currentSegment(TR::ref(_initialSegment)),
-   _lastDestructable(NULL)
+   _lastDestructable(NULL),
+   _collectStackTrace(false)
    {
-   _collectStackTrace = false;
    if (OMR::Options::_collectBackTrace >= 1)
       {
-      if (_compilation = TR::comp())
+      if (TR::comp())
          {
+         _compilation = TR::comp();
          if (_compilation->getOptLevel() >= OMR::Options::_minOptLevelCollected)
             {
+            size_t preCreateBytesAllocated = _segmentProvider.bytesAllocated();
+            
             _collectStackTrace = true;
             _regionAllocMap = new (PERSISTENT_NEW) RegionLog;
             _regionAllocMap->_isHeap = isHeap;
@@ -158,23 +175,33 @@ Region::Region(const Region &prototype, OMR::Compilation *comp, bool isHeap) :
             TR_ASSERT(heapAllocMapList && heapAllocMapListMonitor, "heapAllocMapList unintialized");
             OMR::CriticalSection listInsertCS(heapAllocMapListMonitor);
             heapAllocMapList->push_back(_regionAllocMap);
+
+            size_t postCreateBytesAllocated = _segmentProvider.bytesAllocated();
+            _regionAllocMap->_bytesSegmentProviderAllocated += postCreateBytesAllocated - preCreateBytesAllocated;
+
+            if (postCreateBytesAllocated - preCreateBytesAllocated)
+               printf("segment provider changed in creation of region\n");
             }
          }
       else
          {
          // Case of alias region
-         if (comp && comp->getOptLevel() < OMR::Options::_minOptLevelCollected)
+         if (comp && comp->getOptLevel() >= OMR::Options::_minOptLevelCollected)
             {
-            _collectStackTrace = false;
-            }
-         else
-            {
+            size_t preCreateBytesAllocated = _segmentProvider.bytesAllocated();
+
             _collectStackTrace = true;
             _regionAllocMap = new (PERSISTENT_NEW) RegionLog;
             _regionAllocMap->_isHeap = isHeap;
             void *trace[REGION_BACKTRACE_DEPTH + 1];
             unw_backtrace(trace, REGION_BACKTRACE_DEPTH + 1);
             memcpy(_regionAllocMap->_regionTrace, &trace[1], REGION_BACKTRACE_DEPTH * sizeof(void *));
+            // write method name to distinguish from main heap region
+            size_t length = strlen(comp->signature()) + 1;
+            _regionAllocMap->_methodCompiled = (char *) TR::Compiler->persistentAllocator().allocate(length);
+            memcpy(_regionAllocMap->_methodCompiled, comp->signature(), length);
+            _regionAllocMap->_methodCompiled[length-1] = '\0';
+
             _regionAllocMap->_startTime = comp->recordEvent();
             _regionAllocMap->_startBytesAllocated = _segmentProvider.bytesAllocated();
             comp->recordRegion();
@@ -182,6 +209,16 @@ Region::Region(const Region &prototype, OMR::Compilation *comp, bool isHeap) :
             TR_ASSERT(heapAllocMapList && heapAllocMapListMonitor, "heapAllocMapList unintialized");
             OMR::CriticalSection listInsertCS(heapAllocMapListMonitor);
             heapAllocMapList->push_back(_regionAllocMap);
+
+            size_t postCreateBytesAllocated = _segmentProvider.bytesAllocated();
+            _regionAllocMap->_bytesSegmentProviderAllocated += postCreateBytesAllocated - preCreateBytesAllocated;
+
+            if (postCreateBytesAllocated - preCreateBytesAllocated)
+               printf("segment provider changed in creation of alias region\n");
+            }
+         else
+            {
+            printf("init region without comp\n");
             }
          }
       }
@@ -196,6 +233,7 @@ Region::~Region() throw()
    size_t preReleaseBytesAllocated = _segmentProvider.bytesAllocated();
    size_t preReleaseBytesInUse = _segmentProvider.regionBytesInUse();
    size_t preReleaseBytesRealInUse = _segmentProvider.regionRealBytesInUse();
+
    Destructable *lastDestructable = _lastDestructable;
    while (lastDestructable)
       {
@@ -203,7 +241,8 @@ Region::~Region() throw()
       lastDestructable = currentDestructable->prev();
       currentDestructable->~Destructable();
       }
-   if (_collectStackTrace && OMR::Options::_collectBackTrace >= 2)
+
+   if (_collectStackTrace)
       {
       if (_compilation)
          {
@@ -212,9 +251,10 @@ Region::~Region() throw()
          }
       else
          {
-         _regionAllocMap->_endTime = -1;
+         _regionAllocMap->_endTime = -2;
          printf("destruction without compilation associated\n");
          }
+      
       for (
       TR::reference_wrapper<TR::MemorySegment> latestSegment(_currentSegment);
       latestSegment.get() != _initialSegment;
@@ -224,6 +264,7 @@ Region::~Region() throw()
          _currentSegment = TR::ref(latestSegment.get().unlink());
          _segmentProvider.release(latestSegment);
          }
+      
       size_t postReleaseBytesAllocated = _segmentProvider.bytesAllocated();
       size_t postReleaseBytesInUse = _segmentProvider.regionBytesInUse();
       size_t postReleaseBytesRealInUse = _segmentProvider.regionRealBytesInUse();
@@ -234,10 +275,6 @@ Region::~Region() throw()
       // Get total bytes allocated
       _regionAllocMap->_bytesAllocated = bytesAllocated();
       _regionAllocMap->_endBytesAllocated = _segmentProvider.bytesAllocated();
-      // // add heapAllocMap to heapAllocMapList
-      // TR_ASSERT(heapAllocMapList && heapAllocMapListMonitor, "heapAllocMapList unintialized");
-      // OMR::CriticalSection listInsertCS(heapAllocMapListMonitor);
-      // heapAllocMapList->push_back(_regionAllocMap);
       _regionAllocMap = NULL;
       }
    else
@@ -258,16 +295,25 @@ Region::~Region() throw()
 void *
 Region::allocate(size_t const size, void *hint)
    {
+   // get current allocated from _segmentProvider, get difference after, accumulate to region
+   size_t preRequestBytesAllocated = _segmentProvider.bytesAllocated();
+   size_t preRequestBytesInUse = _segmentProvider.regionBytesInUse();
+   size_t preRequestBytesRealInUse = _segmentProvider.regionRealBytesInUse();
+   
    size_t const roundedSize = round(size);
-   if (_collectStackTrace && roundedSize > 0)
+
+   if (_collectStackTrace)
       {
       // Add compilation information to regionAllocMap for main heap region
-      if (_collectStackTrace && _regionAllocMap->_methodCompiled == NULL)
+      if (_regionAllocMap->_methodCompiled == NULL)
          {
-         if (_compilation = TR::comp())
+         if (TR::comp())
             {
+            _compilation = TR::comp();
             if (_compilation->getOptLevel() >= OMR::Options::_minOptLevelCollected)
                {
+               size_t preCreateBytesAllocated = _segmentProvider.bytesAllocated();
+
                _regionAllocMap->_sequenceNumber = _compilation->getSequenceNumber();
                size_t length = strlen(_compilation->signature()) + 1;
                _regionAllocMap->_methodCompiled = (char *) TR::Compiler->persistentAllocator().allocate(length);
@@ -278,6 +324,9 @@ Region::allocate(size_t const size, void *hint)
                TR_ASSERT(heapAllocMapList && heapAllocMapListMonitor, "heapAllocMapList unintialized");
                OMR::CriticalSection listInsertCS(heapAllocMapListMonitor);
                heapAllocMapList->push_back(_regionAllocMap);
+
+               size_t postCreateBytesAllocated = _segmentProvider.bytesAllocated();
+               _regionAllocMap->_bytesSegmentProviderAllocated += postCreateBytesAllocated - preCreateBytesAllocated;
                }
             else
                {
@@ -307,17 +356,24 @@ Region::allocate(size_t const size, void *hint)
             }
          }
       }
-   // TODO: get current allocated from _segmentProvider, get difference after, accumulate to region
-   size_t preRequestBytesAllocated = _segmentProvider.bytesAllocated();
-   size_t preRequestBytesInUse = _segmentProvider.regionBytesInUse();
-   size_t preRequestBytesRealInUse = _segmentProvider.regionRealBytesInUse();
+   
+   // memory allocation for this call of allocate
    if (_currentSegment.get().remaining() >= roundedSize)
       {
       _bytesAllocated += roundedSize;
+      
+      // check if allocated changed, even though this is highly unlikely
+      if (_collectStackTrace)
+         {
+         size_t postRequestBytesAllocated = _segmentProvider.bytesAllocated();
+         _regionAllocMap->_bytesSegmentProviderAllocated += postRequestBytesAllocated - preRequestBytesAllocated;
+         }
+
       return _currentSegment.get().allocate(roundedSize);
       }
    TR::MemorySegment &newSegment = _segmentProvider.request(roundedSize, true);
-   if (_collectStackTrace && roundedSize > 0)
+
+   if (_collectStackTrace)
       {
       size_t postRequestBytesAllocated = _segmentProvider.bytesAllocated();
       size_t postRequestBytesInUse = _segmentProvider.regionBytesInUse();
@@ -326,10 +382,13 @@ Region::allocate(size_t const size, void *hint)
       _regionAllocMap->_bytesSegmentProviderInUseAllocated += postRequestBytesInUse - preRequestBytesInUse;
       _regionAllocMap->_bytesSegmentProviderRealInUseAllocated += postRequestBytesRealInUse - preRequestBytesRealInUse;
       }
+   
    TR_ASSERT(newSegment.remaining() >= roundedSize, "Allocated segment is too small");
    newSegment.link(_currentSegment.get());
    _currentSegment = TR::ref(newSegment);
+
    _bytesAllocated += roundedSize;
+   
    return _currentSegment.get().allocate(roundedSize);
    }
 
@@ -347,6 +406,7 @@ Region::round(size_t bytes)
 void
 Region::initAllocMapList(TR::PersistentAllocator *allocator)
    {
+      printf("init alloc map list\n");
       if (OMR::Options::_collectBackTrace >= 1)
       {
       _persistentAllocator = allocator;
